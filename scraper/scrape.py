@@ -367,6 +367,9 @@ class Scraper:
 
 if __name__ == '__main__':
     scraper = Scraper()
+    import time
+    start_time = time.time()
     scraper.run()
+    print(f"--- {time.time() - start_time:.2f} seconds ---")
     # print(scraper.cities)
     scraper.save_cities()
