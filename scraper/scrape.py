@@ -1,6 +1,8 @@
+import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import List, Tuple
+import json
 
 import httpx
 import selectolax.parser
@@ -188,6 +190,11 @@ class Scraper:
         for line in wiki_text.splitlines():
             if re.match(r"'{3}\[{2}.*]{2}'{3}", line):
                 if city is not None:
+                    ## This way we don't have to wait for all the results to preview what we have
+                    ## (also we can see some results in case of error, e.g. timeout)
+                    # mode = "a" if os.path.exists("test.jsonl") else "w"
+                    # with open("test.jsonl", mode, encoding="utf-8") as f:
+                    #     f.write(json.dumps(asdict(city)) + "\n")
                     self.cities.append(city)
                 city = self.parse_city(line, country, reference_dict)
             if line == "*{{div col end}}":
@@ -349,7 +356,7 @@ class Scraper:
         """
         with open(filename, "w", encoding="utf-8") as f:
             for city in self.cities:
-                f.write(str(city) + "\n")
+                f.write(json.dumps(asdict(city)) + "\n")
 
     @staticmethod
     def parsed_named_references(named_ref_match: str, reference_dictionary: dict) -> Reference | None:
