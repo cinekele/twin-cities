@@ -223,22 +223,28 @@ class Scraper:
         :param reference_txt: The reference text
         :return: The reference
         """
-        strip_text = re.sub(r"<ref name=\w*>|<ref>|\{\{|</ref>|}}", "", reference_txt)
+        strip_text = re.sub(r"<ref name=\w*>|<ref>|</ref>", "", reference_txt)
         url, title, publisher, language, access_date, date = 6 * (None,)
         for txt in strip_text.split("|"):
             if txt.startswith("url="):
-                url = txt.split("=")[1]
+                url = Scraper.parse_value(txt)
             if txt.startswith("title="):
-                title = txt.split("=")[1]
+                title = Scraper.parse_value(txt)
             if txt.startswith("publisher="):
-                publisher = txt.split("=")[1]
+                publisher = Scraper.parse_value(txt)
             if txt.startswith("language="):
-                language = txt.split("=")[1]
+                language = Scraper.parse_value(txt)
             if txt.startswith("date="):
-                date = txt.split("=")[1]
+                date = Scraper.parse_value(txt)
             if txt.startswith("access-date="):
-                access_date = txt.split("=")[1]
+                access_date = Scraper.parse_value(txt)
         return Reference(url, title, publisher, language, access_date, date)
+
+    @staticmethod
+    def parse_value(txt: str) -> str:
+        res = txt.split("=")[1]
+        res.strip("{}")
+        return res
 
     def parse_city(self, line: str, country: str, reference_dictionary: dict) -> City:
         """
@@ -341,7 +347,7 @@ class Scraper:
         :return: The reference dictionary
         """
         reference_dict = {}
-        find_references = re.findall(r"<ref name=[^>]+?>\{\{.+?}}</ref>", wiki_text)
+        find_references = re.findall(r"<ref name=[^>]+?>[\[{].+?</ref>", wiki_text)
         for found_reference in find_references:
             ref_name = re.search(r"(?<=name=).*?(?=>)", found_reference).group(0)
             clean_ref_name = re.sub(r'["\'\s]+', '', ref_name)
@@ -356,7 +362,7 @@ class Scraper:
         """
         with open(filename, "w", encoding="utf-8") as f:
             for city in self.cities:
-                f.write(json.dumps(asdict(city)) + "\n")
+                f.write(json.dumps(asdict(city), ensure_ascii=False) + "\n")
 
     @staticmethod
     def parsed_named_references(named_ref_match: str, reference_dictionary: dict) -> Reference | None:
@@ -372,11 +378,18 @@ class Scraper:
         return None
 
 
-if __name__ == '__main__':
+def main():
     scraper = Scraper()
     import time
     start_time = time.time()
     scraper.run()
     print(f"--- {time.time() - start_time:.2f} seconds ---")
-    # print(scraper.cities)
     scraper.save_cities()
+
+
+if __name__ == '__main__':
+    main()
+    # scraper = Scraper()
+    # wiki_text = scraper.get_wiki_text(scraper.get_page("List_of_twin_towns_and_sister_cities_in_Argentina"))
+    # scraper.scrape_country(wiki_text, "Argentina")
+    # print(scraper.cities)
