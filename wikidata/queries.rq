@@ -1,0 +1,83 @@
+# SELECT ?id (GROUP_CONCAT(DISTINCT ?desc ; separator=' || ') as ?description)
+# WHERE {
+#   ?id rdfs:label "Radom"@en .
+#   ?id schema:description ?desc .
+# }
+# GROUP BY ?id
+# LIMIT 100
+
+
+# --------------------------------------------------------------------------- #
+#                         Select twinned cities names                         #
+# --------------------------------------------------------------------------- #
+
+SELECT ?val ?label
+WHERE {
+  wd:Q104740 wdt:P190 ?val .
+  
+  
+  SERVICE wikibase:label { 
+    bd:serviceParam wikibase:language "en". 
+    ?val rdfs:label ?label .
+  }
+}
+LIMIT 100
+
+
+# --------------------------------------------------------------------------- #
+#                 Select twinned cities names with references                 #
+#                          and start, end qualifiers                          #
+# --------------------------------------------------------------------------- #
+
+SELECT *
+WHERE
+{
+  wd:Q104740 p:P190 ?statement.
+  ?statement ps:P190 ?val.
+
+  # rank - doesn't matter much - 3 possible values irrelevant for us
+  #?statement wikibase:rank ?rank.
+  # qualifiers
+  OPTIONAL{ ?statement pq:P580 ?starttime. }
+  OPTIONAL{ ?statement pq:P582 ?endtime. }
+  # references
+  OPTIONAL{
+    ?statement prov:wasDerivedFrom ?refnode.
+    ?refnode ?refPr ?ref.
+  }
+  SERVICE wikibase:label { 
+    bd:serviceParam wikibase:language "en". 
+    ?val rdfs:label ?label .
+    ?ref rdfs:label ?labelRef .
+  }
+}
+LIMIT 1000
+
+
+# --------------------------------------------------------------------------- #
+#                 Select twinned cities names with all details                #
+#                          from it's statement group                          #
+#      (longer format - unknown structure (type - relation, qf - value))      #
+# --------------------------------------------------------------------------- #
+
+SELECT *
+WHERE
+{
+  wd:Q104740 p:P190 ?statement.
+  ?statement ps:P190 ?val.
+
+  # rank
+  #?statement wikibase:rank ?rank.
+  # all details about statement
+  OPTIONAL{ ?statement ?type ?qf. }
+  SERVICE wikibase:label { 
+    bd:serviceParam wikibase:language "en". 
+    ?val rdfs:label ?label .
+    ?qf rdfs:label ?labelQualifer .
+  }
+  FILTER (
+    strstarts(str(?type), 'http://www.wikidata.org/prop/qualifier') 
+    || ?type = ps:P190
+  )
+}
+LIMIT 1000
