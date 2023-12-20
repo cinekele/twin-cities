@@ -1,11 +1,14 @@
-import os
+import json
 import re
+
+import mwparserfromhell
+import pywikibot
 from dataclasses import dataclass, field, asdict
 from typing import List, Tuple
-import json
 
 import httpx
 import selectolax.parser
+from mwparserfromhell.wikicode import Wikicode
 
 
 @dataclass(init=True, repr=True, eq=True, order=True, unsafe_hash=False, frozen=False, slots=True)
@@ -23,7 +26,7 @@ class Reference:
 class TwinCitiesAgreement:
     """Class to represent a twin cities agreement"""
     second_city: str
-    second_country: str | None
+    second_country: str
     wiki_url: str | List[str]
     ref: List[Reference] | Reference | None
 
@@ -33,7 +36,7 @@ class City:
     """Class to represent a city"""
     name: str
     country: str
-    wiki_url: str | List[str]
+    wiki_url: str
     ref: list[Reference] | None = None
     twin_cities: List[TwinCitiesAgreement] = field(default_factory=list)
 
@@ -47,42 +50,12 @@ class Scraper:
         :return: The scraper
         """
         self.BASE_PATH = "https://en.wikipedia.org/"
-        self.HEADERS = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/119.0.0.0 Safari/537.36"
-        }
+        self.BASE_SITE = pywikibot.Site('en', 'wikipedia')
         self.countries_to_scrape = set()
         self.continents_to_scrape = set()
         self.cities = []
 
-    def get_page(self, title: str) -> selectolax.parser.HTMLParser | bool:
-        """
-        Get the page from the url
-        :param title: The title of the wiki page
-        :type title: str
-        :return: The page parsed with the Selectolax parser or False if there was an error
-        """
-        url = self.url_edit(title)
-        page = httpx.get(url, headers=self.HEADERS, follow_redirects=True)
-        try:
-            page.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            print(f"HTTP Error: {exc}")
-            return False
-        selectolax_page = selectolax.parser.HTMLParser(page.text)
-        return selectolax_page
-
-    def url_edit(self, title: str) -> str:
-        """
-        Join the url with the base path
-        :param title: The title to join
-        :type title: str
-        :return: The joined url
-        """
-        title_url_part = re.sub(r"\s+", "_", title)
-        return self.BASE_PATH + "w/index.php?title=" + title_url_part + "&action=edit"
-
-    def url_get(self, title: str) -> str:
+    def get_url(self, title: str) -> str:
         """
         Join the url with the base path
         :param title: The title to join
@@ -92,72 +65,79 @@ class Scraper:
         title_url_part = re.sub(r"\s+", "_", title)
         return self.BASE_PATH + "wiki/" + title_url_part
 
-    @staticmethod
-    def get_wiki_text(page: selectolax.parser.HTMLParser) -> str:
+    def get_wiki_text(self, title: str) -> Wikicode:
         """
         Get the wiki text from the page
         :param page: The page to get the wiki text from
         :type page: selectolax.parser.HTMLParser
         :return: The wiki text
         """
-        wiki_text = page.css_first("textarea#wpTextbox1").text()
-        return wiki_text
+        page = pywikibot.Page(self.BASE_SITE, title)
+        wiki_text = page.get()
+        return mwparserfromhell.parse(wiki_text, skip_style_tags=True)
 
-    def add_initial_pages_to_scrape(self, wiki_text: str) -> None:
+    def add_initial_pages_to_scrape(self, wikitext: Wikicode) -> None:
         """
         Add the pages to the scraper
-        :param wiki_text: Wiki text of the initial page
-        :type wiki_text: str
+        :param wikitext: Wiki text of the initial page
+        :type wikitext: str
         :return: None
         """
-        for line in wiki_text.splitlines():
-            if re.match(r"\*\s+", line):
-                continent = re.sub(r"[*\[\]]", "", line).strip()
-                split_continent = continent.split("|")
-                self.continents_to_scrape.update(split_continent)
-            if re.match(r"\*{2}\s+", line):
-                country = re.sub(r"[*\[\]]", "", line).strip()
-                split_country = country.split("|")
-                self.countries_to_scrape.update(split_country)
+        counter = 0
+        for node in wikitext.filter(matches=lambda x: isinstance(x, mwparserfromhell.nodes.wikilink.Wikilink) or (
+                isinstance(x, mwparserfromhell.nodes.tag.Tag) and x.tag == 'li')):
+            if type(node) == mwparserfromhell.nodes.wikilink.Wikilink and str(node.title).startswith(
+                    "List of twin towns and sister cities"):
+                if counter == 1:
+                    self.continents_to_scrape.add((str(node.title), str(node.text)))
+                else:
+                    self.countries_to_scrape.add((str(node.title), str(node.text)))
+            elif type(node) == mwparserfromhell.nodes.tag.Tag:
+                counter += 1
 
     def run(self) -> None:
         """
         Run the scraper
         :return: None
         """
-        initial_page = self.get_page("Lists of twin towns and sister cities")
-        initial_wiki_text = self.get_wiki_text(initial_page)
-        if initial_page:
-            self.add_initial_pages_to_scrape(initial_wiki_text)
-        else:
-            raise Exception("Error getting the initial page")
+        # initial_page = self.get_page("Lists of twin towns and sister cities")
+        initial_wiki_text = self.get_wiki_text("Lists of twin towns and sister cities")
+        self.add_initial_pages_to_scrape(initial_wiki_text)
 
         while self.continents_to_scrape:
-            page = self.get_page(self.continents_to_scrape.pop())
-            if page:
-                wiki_text = self.get_wiki_text(page)
-                self.scrape_continent(wiki_text)
+            title, shown_text = self.continents_to_scrape.pop()
+            continent_name = self.get_country_name(shown_text if shown_text != "None" else title)
+            wikitext = self.get_wiki_text(title)
+            self.scrape_continent(wikitext)
 
         while self.countries_to_scrape:
-            country_list = self.countries_to_scrape.pop()
-            page = self.get_page(country_list)
-            if page:
-                wiki_text = self.get_wiki_text(page)
-                country_name = self.get_country_name(country_list)
-                self.scrape_country(wiki_text, country_name)
+            title, shown_text = self.countries_to_scrape.pop()
+            country_name = self.get_country_name(shown_text if shown_text != "None" else title)
+            wikitext = self.get_wiki_text(title)
+            self.scrape_country(wikitext, country_name)
 
-    def scrape_continent(self, wiki_text: str) -> None:
+    def scrape_page(self, wikitext: str) -> None:
         """
-        Scrape the continent
-        :param wiki_text: Wiki text of the continent page
+        Scrape the page
+        :param wikitext: Wiki text of the page
         :return: None
         """
-        if not self.is_redirect_page(wiki_text):
-            return
+        for el in wikitext.nodes:
+            if isinstance(el, mwparserfromhell.nodes.tag.Tag):
+                if el.tag == 'b':
+                    city_page, city_name = el.contents.nodes[0].title, el.contents.nodes[0].text
+                if el.tag == 'ref':
+                    self.parse_references(el)
 
-        reference_dict = self.build_named_reference_dictionary(wiki_text)
+    def scrape_continent(self, wikitext: Wikicode) -> None:
+        """
+        Scrape the continent
+        :param wikitext: Wiki text of the continent page
+        :return: None
+        """
+        reference_dict = self.build_named_reference_dictionary(wikitext)
         country, city = None, None
-        for line in wiki_text.splitlines():
+        for line in str(wikitext).splitlines():
             if re.match(r"==.*==", line):
                 country = re.sub(r"=", "", line).strip()
             if re.match(r"'{3}\[{2}.*]{2}'{3}", line):
@@ -168,53 +148,37 @@ class Scraper:
                 continue
             if re.match(r'^\*', line):
                 if city is None:
-                    city = City(country, country, self.url_get(country))
+                    city = City(country, country, self.get_url(country))
                 twin_city = self.parse_twin_city(line, reference_dict)
                 city.twin_cities.append(twin_city)
             if re.match(r"\{\{.*}}", line):
                 countries = self.parse_multiple_countries_references(line)
                 self.countries_to_scrape.update(countries)
 
-    def scrape_country(self, wiki_text: str, country: str) -> None:
+    def scrape_country(self, wikitext: Wikicode, country: str) -> None:
         """
         Scrape the country
-        :param wiki_text: wiki_text of the country page
+        :param wikitext: wiki_text of the country page
         :param country: country of the scraped page
         :return: None
         """
-        if not self.is_redirect_page(wiki_text):
-            return
 
-        reference_dict = self.build_named_reference_dictionary(wiki_text)
+        reference_dict = self.build_named_reference_dictionary(wikitext)
         city = None
-        for line in wiki_text.splitlines():
+        for line in str(wikitext).splitlines():
             if re.match(r"'{3}\[{2}.*]{2}'{3}", line):
                 if city is not None:
-                    ## This way we don't have to wait for all the results to preview what we have
-                    ## (also we can see some results in case of error, e.g. timeout)
-                    # mode = "a" if os.path.exists("test.jsonl") else "w"
-                    # with open("test.jsonl", mode, encoding="utf-8") as f:
-                    #     f.write(json.dumps(asdict(city)) + "\n")
                     self.cities.append(city)
                 city = self.parse_city(line, country, reference_dict)
             if line == "*{{div col end}}":
                 continue
             if re.match(r"^\*", line):
                 if city is None:
-                    city = City(country, country, self.url_get(country))
+                    city = City(country, country, self.get_url(country))
                 twin_city = self.parse_twin_city(line, reference_dict)
                 city.twin_cities.append(twin_city)
             if line == "==External links==":
                 break
-
-    @staticmethod
-    def is_redirect_page(wiki_text: str) -> bool:
-        """
-        Check if the page is a redirect page
-        :param wiki_text: wiki_text of the page
-        :return: True if the page is a redirect page, False otherwise
-        """
-        return re.match(r"#REDIRECT", wiki_text) is None
 
     @staticmethod
     def parse_reference(reference_txt: str) -> Reference:
@@ -302,14 +266,14 @@ class Scraper:
         city_split = city.split("|")
         if len(city_split) == 1:
             city = city_split[0]
-            city_url = self.url_get(city)
+            city_url = self.get_url(city)
         else:
             city_tmp = city_split[0]
             if "," in city_tmp:
                 city = city_tmp.split(",")[0]
             else:
                 city = city_tmp
-            city_url = [self.url_get(tmp) for tmp in city_split]
+            city_url = [self.get_url(tmp) for tmp in city_split]
         return city, city_url
 
     @staticmethod
@@ -340,19 +304,22 @@ class Scraper:
         country_name = country_rep.replace("the ", "")
         return country_name
 
-    def build_named_reference_dictionary(self, wiki_text: str) -> dict:
+    def build_named_reference_dictionary(self, wiki_text: Wikicode) -> dict:
         """
         Build the reference dictionary
         :param wiki_text: The wiki text to parse
         :return: The reference dictionary
         """
         reference_dict = {}
-        find_references = re.findall(r"<ref name=[^>]+?>[\[{].+?</ref>", wiki_text)
-        for found_reference in find_references:
-            ref_name = re.search(r"(?<=name=).*?(?=>)", found_reference).group(0)
-            clean_ref_name = re.sub(r'["\'\s]+', '', ref_name)
-            reference = self.parse_reference(found_reference)
-            reference_dict[clean_ref_name] = reference
+        for el in wiki_text.filter(matches=lambda x: isinstance(x, mwparserfromhell.nodes.tag.Tag) and x.tag == 'ref'):
+            if len(el.attributes) == 0:
+                continue
+            for attribute in el.attributes:
+                if attribute.name == "name":
+                    name = str(attribute.value)
+            if len(el.contents.nodes) > 0:
+                template = el.contents.nodes[0]
+                reference_dict[name] = self.parse_reference(str(template))
         return reference_dict
 
     def save_cities(self, filename: str = "cities.jsonl"):
@@ -376,6 +343,18 @@ class Scraper:
             named_ref = reference_dictionary[named_ref_match]
             return named_ref
         return None
+
+    # def parse_reference(self, el: Wikicode) -> Reference:
+    #     """
+    #     Parse the references
+    #     :param el: Wikicode of the reference
+    #     :return: Reference
+    #     """
+    #     elements = el.contents.nodes
+    #     for element in elements:
+    #         if isinstance(element, mwparserfromhell.nodes.tag.Tag):
+    #             if element.tag == 'ref':
+    #                 return self.parse_reference(element)
 
 
 def main():
