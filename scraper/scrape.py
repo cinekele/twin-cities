@@ -1,20 +1,18 @@
 import json
 import re
-
-import mwparserfromhell
-import pywikibot
 from dataclasses import dataclass, field, asdict
 from typing import List, Tuple
 
-import httpx
+import mwparserfromhell
+import pywikibot
 import selectolax.parser
-from mwparserfromhell.wikicode import Wikicode
 
 
 @dataclass(init=True, repr=True, eq=True, order=True, unsafe_hash=False, frozen=False, slots=True)
 class Reference:
     """Class to represent a reference"""
     url: str | None
+    website: str | None
     title: str
     publisher: str | None
     language: str | None
@@ -65,7 +63,7 @@ class Scraper:
         title_url_part = re.sub(r"\s+", "_", title)
         return self.BASE_PATH + "wiki/" + title_url_part
 
-    def get_wiki_text(self, title: str) -> Wikicode:
+    def get_wiki_text(self, title: str) -> mwparserfromhell.wikicode.Wikicode:
         """
         Get the wiki text from the page
         :param page: The page to get the wiki text from
@@ -76,7 +74,7 @@ class Scraper:
         wiki_text = page.get()
         return mwparserfromhell.parse(wiki_text, skip_style_tags=True)
 
-    def add_initial_pages_to_scrape(self, wikitext: Wikicode) -> None:
+    def add_initial_pages_to_scrape(self, wikitext: mwparserfromhell.wikicode.Wikicode) -> None:
         """
         Add the pages to the scraper
         :param wikitext: Wiki text of the initial page
@@ -87,11 +85,12 @@ class Scraper:
         for node in wikitext.filter(matches=lambda x: isinstance(x, mwparserfromhell.nodes.wikilink.Wikilink) or (
                 isinstance(x, mwparserfromhell.nodes.tag.Tag) and x.tag == 'li')):
             if type(node) == mwparserfromhell.nodes.wikilink.Wikilink and str(node.title).startswith(
-                    "List of twin towns and sister cities"):
+                    "List of "):
                 if counter == 1:
                     self.continents_to_scrape.add((str(node.title), str(node.text)))
                 else:
                     self.countries_to_scrape.add((str(node.title), str(node.text)))
+                counter = 0
             elif type(node) == mwparserfromhell.nodes.tag.Tag:
                 counter += 1
 
@@ -129,7 +128,7 @@ class Scraper:
                 if el.tag == 'ref':
                     self.parse_references(el)
 
-    def scrape_continent(self, wikitext: Wikicode) -> None:
+    def scrape_continent(self, wikitext: mwparserfromhell.wikicode.Wikicode) -> None:
         """
         Scrape the continent
         :param wikitext: Wiki text of the continent page
@@ -155,7 +154,7 @@ class Scraper:
                 countries = self.parse_multiple_countries_references(line)
                 self.countries_to_scrape.update(countries)
 
-    def scrape_country(self, wikitext: Wikicode, country: str) -> None:
+    def scrape_country(self, wikitext: mwparserfromhell.wikicode.Wikicode, country: str) -> None:
         """
         Scrape the country
         :param wikitext: wiki_text of the country page
@@ -181,28 +180,20 @@ class Scraper:
                 break
 
     @staticmethod
-    def parse_reference(reference_txt: str) -> Reference:
+    def parse_reference(reference_txt: mwparserfromhell.nodes.template.Template) -> Reference:
         """
         Parse the reference
         :param reference_txt: The reference text
         :return: The reference
         """
-        strip_text = re.sub(r"<ref name=\w*>|<ref>|</ref>", "", reference_txt)
-        url, title, publisher, language, access_date, date = 6 * (None,)
-        for txt in strip_text.split("|"):
-            if txt.startswith("url="):
-                url = Scraper.parse_value(txt)
-            if txt.startswith("title="):
-                title = Scraper.parse_value(txt)
-            if txt.startswith("publisher="):
-                publisher = Scraper.parse_value(txt)
-            if txt.startswith("language="):
-                language = Scraper.parse_value(txt)
-            if txt.startswith("date="):
-                date = Scraper.parse_value(txt)
-            if txt.startswith("access-date="):
-                access_date = Scraper.parse_value(txt)
-        return Reference(url, title, publisher, language, access_date, date)
+        url = reference_txt.get("url").value if reference_txt.has("url") else None
+        title = reference_txt.get("title").value if reference_txt.has("title") else None
+        publisher = reference_txt.get("publisher").value if reference_txt.has("publisher") else None
+        language = reference_txt.get("language").value if reference_txt.has("language") else None
+        access_date = reference_txt.get("access-date").value if reference_txt.has("access-date") else None
+        date = reference_txt.get("date").value if reference_txt.has("date") else None
+        website = reference_txt.get("website").value if reference_txt.has("website") else None
+        return Reference(url, website, title, publisher, language, access_date, date)
 
     @staticmethod
     def parse_value(txt: str) -> str:
@@ -304,7 +295,7 @@ class Scraper:
         country_name = country_rep.replace("the ", "")
         return country_name
 
-    def build_named_reference_dictionary(self, wiki_text: Wikicode) -> dict:
+    def build_named_reference_dictionary(self, wiki_text: mwparserfromhell.wikicode.Wikicode) -> dict:
         """
         Build the reference dictionary
         :param wiki_text: The wiki text to parse
@@ -319,7 +310,7 @@ class Scraper:
                     name = str(attribute.value)
             if len(el.contents.nodes) > 0:
                 template = el.contents.nodes[0]
-                reference_dict[name] = self.parse_reference(str(template))
+                reference_dict[name] = self.parse_reference(template)
         return reference_dict
 
     def save_cities(self, filename: str = "cities.jsonl"):
