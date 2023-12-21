@@ -68,7 +68,7 @@ class Scraper:
     def get_wiki_text(self, title: str) -> mwparserfromhell.wikicode.Wikicode:
         """
         Get the wiki text from the page
-        :param page: The page to get the wiki text from
+        :param title: The title of the page
         :return: The wiki text parsed
         """
         page = pywikibot.Page(self.BASE_SITE, title)
