@@ -11,13 +11,13 @@ import selectolax.parser
 @dataclass(init=True, repr=True, eq=True, order=True, unsafe_hash=False, frozen=False, slots=True)
 class Reference:
     """Class to represent a reference"""
-    url: str | None
-    website: str | None
-    title: str
-    publisher: str | None
-    language: str | None
-    access_date: str | None
-    date: str | None
+    url: str | None = None
+    website: str | None = None
+    title: str | None = None
+    publisher: str | None = None
+    language: str | None = None
+    access_date: str | None = None
+    date: str | None = None
 
 
 @dataclass(init=True, repr=True, eq=True, order=True, unsafe_hash=False, frozen=False, slots=True)
@@ -75,7 +75,7 @@ class Scraper:
         :return: The wiki text
         """
         page = pywikibot.Page(self.BASE_SITE, title)
-        wiki_text = page.get()
+        wiki_text = page.get(get_redirect=True)
         return mwparserfromhell.parse(wiki_text, skip_style_tags=True)
 
     def add_initial_pages_to_scrape(self, wikitext: mwparserfromhell.wikicode.Wikicode) -> None:
@@ -91,9 +91,9 @@ class Scraper:
             if type(node) == mwparserfromhell.nodes.wikilink.Wikilink and str(node.title).startswith(
                     "List of "):
                 if counter == 1:
-                    self.continents_to_scrape.add((str(node.title), str(node.text)))
+                    self.continents_to_scrape.add((str(node.title), str(node.text) if node.text is not None else None))
                 else:
-                    self.countries_to_scrape.add((str(node.title), str(node.text)))
+                    self.countries_to_scrape.add((str(node.title), str(node.text) if node.text is not None else None))
                 counter = 0
             elif type(node) == mwparserfromhell.nodes.tag.Tag:
                 counter += 1
@@ -108,7 +108,7 @@ class Scraper:
 
         while self.continents_to_scrape:
             title, shown_text = self.continents_to_scrape.pop()
-            continent_name = self.get_country_name(shown_text if shown_text != "None" else title)
+            continent_name = self.get_country_name(shown_text if shown_text is not None else title)
             wikitext = self.get_wiki_text(title)
             cities = self.scrape_continent(wikitext)
             for city in cities:
@@ -118,13 +118,13 @@ class Scraper:
 
         while self.countries_to_scrape:
             title, shown_text = self.countries_to_scrape.pop()
-            country_name = self.get_country_name(shown_text if shown_text != "None" else title)
+            country_name = self.get_country_name(shown_text if shown_text is not None else title)
             wikitext = self.get_wiki_text(title)
-            self.scrape_country(wikitext, country_name)
+            cities = self.scrape_country(wikitext, country_name)
             for city in self.cities:
                 city.source_page = title
                 city.source_type = "country"
-            self.cities.extend(self.cities)
+            self.cities.extend(cities)
 
     def scrape_continent(self, wikitext: mwparserfromhell.wikicode.Wikicode) -> list[City]:
         """
@@ -195,20 +195,59 @@ class Scraper:
 
         reference_dict = self.build_named_reference_dictionary(wikitext)
         cities = []
-        for line in str(wikitext).splitlines():
-            if re.match(r"'{3}\[{2}.*]{2}'{3}", line):
+        header, city, twin_city, twin_city_ref = 4 * [None]
+        count = 0
+        last_count = -1
+        for line in wikitext.filter(matches=lambda x: isinstance(x, (mwparserfromhell.nodes.template.Template,
+                                                                     mwparserfromhell.nodes.tag.Tag,
+                                                                     mwparserfromhell.nodes.heading.Heading,
+                                                                     mwparserfromhell.wikicode.Wikilink))):
+            if isinstance(line, mwparserfromhell.nodes.heading.Heading):
+                header = str(line.title)
                 if city is not None:
-                    self.cities.append(city)
-                city = self.parse_city(line, country, reference_dict)
-            if line == "*{{div col end}}":
-                continue
-            if re.match(r"^\*", line):
+                    count = 0
+                    city = None
+                    twin_city = None
+                if header == "References":
+                    break
+            elif isinstance(line, mwparserfromhell.wikicode.Wikilink):
+                if header is None:
+                    continue
+                if count == 0 or last_count == count:
+                    city_name, city_title = str(line.text if line.text is not None else line.title), str(line.title)
+                    city_url = self.get_url(str(line.title))
+                    city = City(name=city_name, country=country, wiki_text=city_title, wiki_url=city_url)
+                    last_count = -1
+                    count = 0
+                    cities.append(city)
+                else:
+                    twin_city_name, twin_city_title = str(line.text if line.text is not None else line.title), str(
+                        line.title)
+                    twin_city_url = self.get_url(str(line.title))
+                    twin_country = wikitext.nodes[wikitext.index(line) + 1].strip(", \n'")
+                    twin_city = TwinCitiesAgreement(second_city=twin_city_name, second_country=twin_country,
+                                                    wiki_url=twin_city_url,
+                                                    wiki_text=twin_city_title)
+                    city.twin_cities.append(twin_city)
+                    last_count = count
+            elif isinstance(line, mwparserfromhell.nodes.tag.Tag) and line.tag == "ref":
+                if header is None:
+                    continue
+                if count == 0:
+                    city_ref = self.parse_reference(line, reference_dict)
+                    if city_ref is not None:
+                        city.ref.append(city_ref)
+                else:
+                    twin_city_ref = self.parse_reference(line, reference_dict)
+                    if twin_city_ref is not None:
+                        twin_city.refs.append(twin_city_ref)
+            elif isinstance(line, mwparserfromhell.nodes.tag.Tag) and line.tag == "li":
+                count += 1
                 if city is None:
-                    city = City(country, country, self.get_url(country))
-                twin_city = self.parse_twin_city(line, reference_dict)
-                city.twin_cities.append(twin_city)
-            if line == "==External links==":
-                break
+                    city = City(country, country, wiki_text=country, wiki_url=self.get_url(country))
+            elif isinstance(line, mwparserfromhell.nodes.template.Template) and line.name == 'main':
+                another_list = line.params[0].value
+                self.countries_to_scrape.add((str(another_list), None))
         return cities
 
     def parse_reference(self, reference_tag: mwparserfromhell.nodes.tag.Tag,
@@ -220,22 +259,33 @@ class Scraper:
         :return: The reference
         """
         if len(reference_tag.attributes) == 0:
-            reference = self.get_reference(reference_tag.contents.nodes[0])
+            reference = self.get_reference(reference_tag.contents.nodes)
         else:
             attributes = reference_tag.attributes
             for attribute in attributes:
                 if attribute.name == "name":
                     name = str(attribute.value)
-            reference = reference_dict[name]
+            reference = reference_dict[name] if name in reference_dict else None
         return reference
 
     @staticmethod
-    def get_reference(reference_txt: mwparserfromhell.nodes.template.Template) -> Reference:
+    def get_reference(
+            nodes: list[mwparserfromhell.nodes.Node]) -> Reference:
         """
         Parse the reference
         :param reference_txt: The template of the reference
         :return: The reference
         """
+        if len(nodes) == 1:
+            reference_txt = nodes[0]
+        else:
+            if str(nodes[0]).startswith("url"):
+                url = str(nodes[1])
+                return Reference(url=url)
+            else:
+                reference_txt = nodes[0]
+        if isinstance(reference_txt, mwparserfromhell.nodes.ExternalLink):
+            return Reference(url=str(reference_txt.url))
         url = str(reference_txt.get("url").value) if reference_txt.has("url") else None
         title = str(reference_txt.get("title").value) if reference_txt.has("title") else None
         publisher = str(reference_txt.get("publisher").value) if reference_txt.has("publisher") else None
@@ -244,53 +294,6 @@ class Scraper:
         date = str(reference_txt.get("date").value) if reference_txt.has("date") else None
         website = str(reference_txt.get("website").value) if reference_txt.has("website") else None
         return Reference(url, website, title, publisher, language, access_date, date)
-
-    def parse_city(self, line: str, country: str, reference_dictionary: dict) -> City:
-        """
-        Parse the city
-        :param reference_dictionary: reference dictionary for the parsed page
-        :param line: line of the wiki text
-        :param country: country of the city
-        :return: City instance
-        """
-        city = re.search(r"'{3}\[{2}(.*)]{2}'{3}", line).group(0).strip("'[]'")
-        city, city_url = self.parse_multiple_city_references(city)
-        ref_matches = re.findall(r'<ref>(.*)</ref>', line)
-        city_refs = [self.get_reference(ref_match) for ref_match in ref_matches] if ref_matches else None
-        named_ref_matches = re.findall(r'(?<=<ref name=).*?(?=/?>)', line)
-        named_references = [
-            self.parsed_named_references(re.sub(r'["\'\s]+', '', named_ref_match), reference_dictionary) for
-            named_ref_match in named_ref_matches
-        ] if named_ref_matches else None
-        if named_references is not None and city_refs is not None:
-            city_refs.extend(named_references)
-        elif named_references is not None and city_refs is None:
-            city_refs = named_references
-        return City(city, country, city_url, city_refs)
-
-    def parse_twin_city(self, line: str, reference_dictionary: dict) -> TwinCitiesAgreement:
-        """
-        Parse the twin city
-        :param reference_dictionary: Reference dictionary for the parsed page
-        :param line: line of the wiki text
-        :return: TwinCitiesAgreement instance
-        """
-        twin_city_match = re.search(r'\[{2}(.*)]{2}', line).group(0).strip("[]")
-        twin_city, twin_city_url = self.parse_multiple_city_references(twin_city_match)
-        country_match = re.search(r'(?<=]]),\s+.*(<ref.*>)?', line)
-        country = re.sub(r',\s+|<ref.*>', "", country_match.group(0)) if country_match else None
-        ref_matches = re.search(r'<ref>(.*)</ref>', line)
-        references = [self.get_reference(ref_match) for ref_match in ref_matches.groups()] if ref_matches else None
-        named_ref_matches = re.findall(r'(?<=<ref name=).*?(?=/?>)', line)
-        named_references = [
-            self.parsed_named_references(re.sub(r'["\'\s]+', '', named_ref_match), reference_dictionary) for
-            named_ref_match in
-            named_ref_matches] if named_ref_matches else None
-        if named_references is not None and references is not None:
-            references.extend(named_references)
-        elif named_references is not None and references is None:
-            references = named_references
-        return TwinCitiesAgreement(twin_city, country, twin_city_url, references)
 
     @staticmethod
     def get_country_name(country_string: str) -> str:
@@ -313,11 +316,14 @@ class Scraper:
         for el in wiki_text.filter(matches=lambda x: isinstance(x, mwparserfromhell.nodes.tag.Tag) and x.tag == 'ref'):
             if len(el.attributes) == 0:
                 continue
+            is_good = True
             for attribute in el.attributes:
                 if attribute.name == "name":
                     name = str(attribute.value)
-            if len(el.contents.nodes) > 0:
-                template = el.contents.nodes[0]
+                if attribute.name == "group":
+                    is_good = False
+            if len(el.contents.nodes) == 1 and is_good:
+                template = el.contents.nodes
                 reference_dict[name] = self.get_reference(template)
         return reference_dict
 
@@ -343,18 +349,6 @@ class Scraper:
             return named_ref
         return None
 
-    # def parse_reference(self, el: Wikicode) -> Reference:
-    #     """
-    #     Parse the references
-    #     :param el: Wikicode of the reference
-    #     :return: Reference
-    #     """
-    #     elements = el.contents.nodes
-    #     for element in elements:
-    #         if isinstance(element, mwparserfromhell.nodes.tag.Tag):
-    #             if element.tag == 'ref':
-    #                 return self.parse_reference(element)
-
 
 def main():
     scraper = Scraper()
@@ -375,10 +369,17 @@ def continent_test():
             print(twin)
 
 
+def country_test():
+    scraper = Scraper()
+    wiki_text = scraper.get_wiki_text("List of twin towns and sister cities in Poland")
+    result = scraper.scrape_country(wiki_text, "Poland")
+    for res in result:
+        print(res)
+        for twin in res.twin_cities:
+            print(twin)
+
+
 if __name__ == '__main__':
-    main()
+    # country_test()
     # continent_test()
-    # scraper = Scraper()
-    # wiki_text = scraper.get_wiki_text(scraper.get_page("List_of_twin_towns_and_sister_cities_in_Argentina"))
-    # scraper.scrape_country(wiki_text, "Argentina")
-    # print(scraper.cities)
+    main()
