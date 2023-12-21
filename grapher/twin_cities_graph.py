@@ -17,37 +17,23 @@ class TwinCitiesGraph:
 
     def add_cities(self, cities: list[City]):
         for city in cities:
-            if type(city.wiki_url) == str:
-                city.wiki_url = [city.wiki_url]
-            for url in city.wiki_url:
-                self._add_city(url, city.name, city.country, city.wiki_url, city.ref)
-                for twin in city.twin_cities:
-                    self._add_twin(url, twin)
+            self._add_city(city.wiki_url, city.name, city.country, city.ref)
+            for twin in city.twin_cities:
+                self._add_twin(city.wiki_url, twin)
 
-    def _add_city(self, url: str, name: str, country: str, same_as: list[str], references: list[Reference] | Reference | None):
+    def _add_city(self, url: str, name: str, country: str, references: list[Reference]):
         url = URIRef(url)
         self._add_triple(url, RDF.type, self.twin_cities.City)
         self._add_triple(url, RDFS.label, Literal(name))
         self._add_triple(url, self.twin_cities.country, Literal(country))
-        for same_as_url in same_as:
-            same_as_url = URIRef(same_as_url)
-            if same_as_url != url:
-                # todo: check if should be bidirectional
-                self._add_triple(url, self.twin_cities.sameAs, same_as_url)
-        if references is not None:
-            if type(references) == Reference:
-                references = [references]
-            for reference in references:
-                self._add_reference(url, reference)
+        for reference in references:
+            self._add_reference(url, reference)
 
     def _add_twin(self, city_url: str, twin: TwinCitiesAgreement):
         city_url = URIRef(city_url)
-        if type(twin.wiki_url) == str:
-            twin.wiki_url = [twin.wiki_url]
-        for twin_url in twin.wiki_url:
-            self._add_city(twin_url, twin.second_city, twin.second_country, twin.wiki_url, twin.ref)
-            twin_url = URIRef(twin_url)
-            self._add_triple(city_url, self.twin_cities.twin, twin_url)
+        self._add_city(twin.wiki_url, twin.second_city, twin.second_country, twin.refs)
+        twin_url = URIRef(twin.wiki_url)
+        self._add_triple(city_url, self.twin_cities.twin, twin_url)
 
     def _add_reference(self, city_url: URIRef, reference: Reference):
         if reference.url is None:
