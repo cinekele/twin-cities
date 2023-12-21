@@ -1,7 +1,7 @@
 import json
 import re
 from dataclasses import dataclass, field, asdict
-from typing import List, Tuple, Dict
+from typing import List, Dict
 
 import mwparserfromhell
 import pywikibot
@@ -88,14 +88,14 @@ class Scraper:
         counter = 0
         for node in wikitext.filter(matches=lambda x: isinstance(x, mwparserfromhell.nodes.wikilink.Wikilink) or (
                 isinstance(x, mwparserfromhell.nodes.tag.Tag) and x.tag == 'li')):
-            if type(node) == mwparserfromhell.nodes.wikilink.Wikilink and str(node.title).startswith(
+            if isinstance(node, mwparserfromhell.nodes.wikilink.Wikilink) and str(node.title).startswith(
                     "List of "):
                 if counter == 1:
                     self.continents_to_scrape.add((str(node.title), str(node.text) if node.text is not None else None))
                 else:
                     self.countries_to_scrape.add((str(node.title), str(node.text) if node.text is not None else None))
                 counter = 0
-            elif type(node) == mwparserfromhell.nodes.tag.Tag:
+            elif isinstance(node, mwparserfromhell.nodes.tag.Tag):
                 counter += 1
 
     def run(self) -> None:
@@ -108,7 +108,6 @@ class Scraper:
 
         while self.continents_to_scrape:
             title, shown_text = self.continents_to_scrape.pop()
-            continent_name = self.get_country_name(shown_text if shown_text is not None else title)
             wikitext = self.get_wiki_text(title)
             cities = self.scrape_continent(wikitext)
             for city in cities:
@@ -119,6 +118,8 @@ class Scraper:
         while self.countries_to_scrape:
             title, shown_text = self.countries_to_scrape.pop()
             country_name = self.get_country_name(shown_text if shown_text is not None else title)
+            if country_name == "Metro Manila":
+                continue
             wikitext = self.get_wiki_text(title)
             cities = self.scrape_country(wikitext, country_name)
             for city in cities:
@@ -215,6 +216,8 @@ class Scraper:
                     continue
                 if count == 0 or last_count == count:
                     city_name, city_title = str(line.text if line.text is not None else line.title), str(line.title)
+                    if city_name == "town twinning" or city_name == "European Union":
+                        continue
                     city_url = self.get_url(str(line.title))
                     city = City(name=city_name, country=country, wiki_text=city_title, wiki_url=city_url)
                     last_count = -1
@@ -273,7 +276,6 @@ class Scraper:
             nodes: list[mwparserfromhell.nodes.Node]) -> Reference:
         """
         Parse the reference
-        :param reference_txt: The template of the reference
         :return: The reference
         """
         if len(nodes) == 1:
