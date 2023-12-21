@@ -5,6 +5,9 @@ from rdflib.term import Node
 from scraper.scrape import City, TwinCitiesAgreement, Reference
 
 
+def coalesce(*arg):
+    return next((a for a in arg if a is not None), None)
+
 class TwinCitiesGraph:
     def __init__(self, cities: list[City] = None):
         self.graph = Graph()
@@ -38,13 +41,7 @@ class TwinCitiesGraph:
         self._add_triple(city_url, self.twin_cities.twin, twin_url)
 
     def _add_reference(self, city_url: URIRef, reference: Reference):
-        url = reference.url
-        if url is None:
-            url = reference.title
-            if url is None:
-                url = reference.publisher
-                if url is None:
-                    url = "unknown"
+        url = coalesce(reference.url, reference.title, reference.publisher, "unknown")
 
         if url in self.references:
             ref = self.references[url]
