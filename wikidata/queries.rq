@@ -1,19 +1,22 @@
-# SELECT ?id (GROUP_CONCAT(DISTINCT ?desc ; separator=' || ') as ?description)
-# WHERE {
-#   ?id rdfs:label "Radom"@en .
-#   ?id schema:description ?desc .
-# }
-# GROUP BY ?id
-# LIMIT 100
+# --------------------------------------------------------------------------- #
+#                 Find wikidata identifier from wikipedia URL                 #
+# --------------------------------------------------------------------------- #
+
+SELECT ?id WHERE {
+  ?id ^schema:about <https://en.wikipedia.org/wiki/%C5%81owicz> .
+}
 
 
 # --------------------------------------------------------------------------- #
 #                         Select twinned cities names                         #
 # --------------------------------------------------------------------------- #
 
-SELECT ?val ?label
+SELECT ?id ?val ?label
 WHERE {
-  wd:Q104740 wdt:P190 ?val .
+  {
+    ?id ^schema:about <https://en.wikipedia.org/wiki/%C5%81owicz> .
+  }
+  ?id wdt:P190 ?val .
   
   
   SERVICE wikibase:label { 
@@ -32,7 +35,10 @@ LIMIT 100
 SELECT *
 WHERE
 {
-  wd:Q104740 p:P190 ?statement.
+  {
+    ?id ^schema:about <https://en.wikipedia.org/wiki/%C5%81owicz> .
+  }
+  ?id p:P190 ?statement.
   ?statement ps:P190 ?val.
 
   # rank - doesn't matter much - 3 possible values irrelevant for us
@@ -63,7 +69,10 @@ LIMIT 1000
 SELECT *
 WHERE
 {
-  wd:Q104740 p:P190 ?statement.
+  {
+    ?id ^schema:about <https://en.wikipedia.org/wiki/%C5%81owicz> .
+  }
+  ?id p:P190 ?statement.
   ?statement ps:P190 ?val.
 
   # rank
