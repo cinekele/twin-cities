@@ -121,7 +121,7 @@ class Scraper:
             country_name = self.get_country_name(shown_text if shown_text is not None else title)
             wikitext = self.get_wiki_text(title)
             cities = self.scrape_country(wikitext, country_name)
-            for city in self.cities:
+            for city in cities:
                 city.source_page = title
                 city.source_type = "country"
             self.cities.extend(cities)
