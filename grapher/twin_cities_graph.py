@@ -8,6 +8,7 @@ from scraper.scrape import City, TwinCitiesAgreement, Reference
 def coalesce(*arg):
     return next((a for a in arg if a is not None), None)
 
+
 class TwinCitiesGraph:
     def __init__(self, cities: list[City] = None):
         self.graph = Graph()
@@ -22,26 +23,29 @@ class TwinCitiesGraph:
 
     def add_cities(self, cities: list[City]):
         for city in cities:
-            self._add_city(city.wiki_url, city.name, city.country, city.ref)
+            self._add_city(city.wiki_url, city.name, city.country, city.wiki_text, city.source_page, city.source_type, city.ref)
             for twin in city.twin_cities:
                 self._add_twin(city.wiki_url, twin)
 
-    def _add_city(self, url: str, name: str, country: str, references: list[Reference]):
+    def _add_city(self, url: str, name: str, country: str, wiki_text: str, source_page: str | None, source_type: str | None, references: list[Reference]):
         url = URIRef(url)
         self._add_triple(url, RDF.type, self.twin_cities.City)
         self._add_triple(url, RDFS.label, Literal(name))
         self._add_triple(url, self.twin_cities.country, Literal(country))
+        self._add_triple(url, self.twin_cities.wikiText, Literal(wiki_text))
+        self._add_triple(url, self.twin_cities.sourcePage, Literal(source_page))
+        self._add_triple(url, self.twin_cities.sourceType, Literal(source_type))
         for reference in references:
             self._add_reference(url, reference)
 
     def _add_twin(self, city_url: str, twin: TwinCitiesAgreement):
         city_url = URIRef(city_url)
-        self._add_city(twin.wiki_url, twin.second_city, twin.second_country, twin.refs)
+        self._add_city(twin.wiki_url, twin.second_city, twin.second_country, twin.wiki_text, None, None, twin.refs)
         twin_url = URIRef(twin.wiki_url)
         self._add_triple(city_url, self.twin_cities.twin, twin_url)
 
     def _add_reference(self, city_url: URIRef, reference: Reference):
-        url = coalesce(reference.url, reference.title, reference.publisher, "unknown")
+        url = coalesce(reference.url, reference.website, reference.title, reference.publisher, "unknown")
 
         if url in self.references:
             ref = self.references[url]
@@ -50,6 +54,7 @@ class TwinCitiesGraph:
             self._add_triple(ref, RDF.type, self.twin_cities.Reference)
             self._add_triple(ref, self.twin_cities.url, Literal(reference.url))
 
+        self._add_triple(ref, self.twin_cities.author, Literal(reference.website))
         self._add_triple(ref, RDFS.label, Literal(reference.title))
         self._add_triple(ref, self.twin_cities.publisher, Literal(reference.publisher))
         self._add_triple(ref, self.twin_cities.language, Literal(reference.language))
