@@ -1,11 +1,9 @@
 import json
 import re
 from dataclasses import dataclass, field, asdict
-from typing import List, Dict
 
 import mwparserfromhell
 import pywikibot
-import selectolax.parser
 
 
 @dataclass(init=True, repr=True, eq=True, order=True, unsafe_hash=False, frozen=False, slots=True)
@@ -27,7 +25,7 @@ class TwinCitiesAgreement:
     second_country: str
     wiki_url: str
     wiki_text: str
-    refs: List[Reference] = field(default_factory=list)
+    refs: list[Reference] = field(default_factory=list)
 
 
 @dataclass(init=True, repr=True, eq=True, order=True, unsafe_hash=False, frozen=False, slots=True)
@@ -40,7 +38,7 @@ class City:
     source_page: str | None = None
     source_type: str = "country"
     ref: list[Reference] = field(default_factory=list)
-    twin_cities: List[TwinCitiesAgreement] = field(default_factory=list)
+    twin_cities: list[TwinCitiesAgreement] = field(default_factory=list)
 
 
 class Scraper:
@@ -71,8 +69,7 @@ class Scraper:
         """
         Get the wiki text from the page
         :param page: The page to get the wiki text from
-        :type page: selectolax.parser.HTMLParser
-        :return: The wiki text
+        :return: The wiki text parsed
         """
         page = pywikibot.Page(self.BASE_SITE, title)
         wiki_text = page.get(get_redirect=True)
@@ -186,7 +183,7 @@ class Scraper:
                 self.countries_to_scrape.add((str(another_list), None))
         return cities
 
-    def scrape_country(self, wikitext: mwparserfromhell.wikicode.Wikicode, country: str) -> List[City]:
+    def scrape_country(self, wikitext: mwparserfromhell.wikicode.Wikicode, country: str) -> list[City]:
         """
         Scrape the country
         :param wikitext: wiki_text of the country page
@@ -254,7 +251,7 @@ class Scraper:
         return cities
 
     def parse_reference(self, reference_tag: mwparserfromhell.nodes.tag.Tag,
-                        reference_dict: Dict[str, Reference]) -> Reference:
+                        reference_dict: dict[str, Reference]) -> Reference:
         """
         Parse the reference
         :param reference_dict: Dictionary of the references
@@ -308,7 +305,7 @@ class Scraper:
         country_name = country_rep.replace("the ", "")
         return country_name
 
-    def build_named_reference_dictionary(self, wiki_text: mwparserfromhell.wikicode.Wikicode) -> dict:
+    def build_named_reference_dictionary(self, wiki_text: mwparserfromhell.wikicode.Wikicode) -> dict[str, Reference]:
         """
         Build the reference dictionary
         :param wiki_text: The wiki text to parse
