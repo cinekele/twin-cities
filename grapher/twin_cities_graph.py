@@ -1,4 +1,4 @@
-from rdflib import Graph, Namespace, Literal, URIRef
+from rdflib import Graph, Namespace, Literal, URIRef, BNode
 from rdflib.namespace import RDF, RDFS
 from rdflib.term import Node
 
@@ -12,6 +12,8 @@ class TwinCitiesGraph:
         self.graph.bind("twin-cities", self.twin_cities)
         self.wiki = Namespace("https://en.wikipedia.org/wiki/")
         self.graph.bind("wiki", self.wiki)
+        self.references = {}
+
         if cities is not None:
             self.add_cities(cities)
 
@@ -36,17 +38,29 @@ class TwinCitiesGraph:
         self._add_triple(city_url, self.twin_cities.twin, twin_url)
 
     def _add_reference(self, city_url: URIRef, reference: Reference):
-        if reference.url is None:
-            return
-        url = URIRef(reference.url)
-        self._add_triple(url, RDF.type, self.twin_cities.Reference)
-        self._add_triple(url, RDFS.label, Literal(reference.title))
-        self._add_triple(url, self.twin_cities.publisher, Literal(reference.publisher))
-        self._add_triple(url, self.twin_cities.language, Literal(reference.language))
-        self._add_triple(url, self.twin_cities.accessDate, Literal(reference.access_date))
-        self._add_triple(url, self.twin_cities.date, Literal(reference.date))
+        url = reference.url
+        if url is None:
+            url = reference.title
+            if url is None:
+                url = reference.publisher
+                if url is None:
+                    url = "unknown"
 
-        self._add_triple(city_url, self.twin_cities.reference, url)
+        if url in self.references:
+            ref = self.references[url]
+        else:
+            ref = BNode()
+            self._add_triple(ref, RDF.type, self.twin_cities.Reference)
+            self._add_triple(ref, self.twin_cities.url, Literal(reference.url))
+
+        self._add_triple(ref, RDFS.label, Literal(reference.title))
+        self._add_triple(ref, self.twin_cities.publisher, Literal(reference.publisher))
+        self._add_triple(ref, self.twin_cities.language, Literal(reference.language))
+        self._add_triple(ref, self.twin_cities.accessDate, Literal(reference.access_date))
+        self._add_triple(ref, self.twin_cities.date, Literal(reference.date))
+
+        self._add_triple(city_url, self.twin_cities.reference, ref)
+        self.references[url] = ref
 
     def _add_triple(self, subject: Node | None, predicate: Node, object_: Node | None):
         if subject is None or object_ is None or object_ == Literal("None"):
