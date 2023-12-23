@@ -33,14 +33,28 @@ LIMIT 100
 #                               !use this ONE!                                #
 # --------------------------------------------------------------------------- #
 
-SELECT *
+PREFIX wikibase: <http://wikiba.se/ontology#>
+PREFIX p: <http://www.wikidata.org/prop/>
+PREFIX ps: <http://www.wikidata.org/prop/statement/>
+PREFIX pq: <http://www.wikidata.org/prop/qualifier/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+PREFIX pr: <http://www.wikidata.org/prop/reference/>
+
+PREFIX schema: <http://schema.org/>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+
+SELECT ("https://en.wikipedia.org/wiki/Radom" as ?sourceWikipediaURL) 
+  ?sourceId ?targetId ?targetLabel
+  ?starttime ?endtime
+  ?retrieved ?referenceURL ?publisher ?title
 WHERE
 {
   {
-    ?id ^schema:about <https://en.wikipedia.org/wiki/Radom> .
+    ?sourceId ^schema:about <https://en.wikipedia.org/wiki/Radom> .
   }
-  ?id p:P190 ?statement.
-  ?statement ps:P190 ?val.
+  ?sourceId p:P190 ?statement.
+  ?statement ps:P190 ?targetId.
 
   # rank - doesn't matter much - 3 possible values irrelevant for us
   #?statement wikibase:rank ?rank.
@@ -48,19 +62,28 @@ WHERE
   OPTIONAL{ ?statement pq:P580 ?starttime. }
   OPTIONAL{ ?statement pq:P582 ?endtime. }
   # references
-  # TODO: add more refPr - P854, and more title, etc.
-  OPTIONAL{
-    ?statement prov:wasDerivedFrom ?refnode.
-    ?refnode ?refPr ?ref.
+  OPTIONAL {
+    ?statement prov:wasDerivedFrom ?refnode .
+    ?refnode pr:P813 ?retrieved .
+  }
+  OPTIONAL {
+    ?statement prov:wasDerivedFrom ?refnode .
+    ?refnode pr:P854 ?referenceURL .
+  }
+  OPTIONAL {
+    ?statement prov:wasDerivedFrom ?refnode .
+    ?refnode pr:P123 ?publisher .
+  }
+  OPTIONAL {
+    ?statement prov:wasDerivedFrom ?refnode .
+    ?refnode pr:P1476 ?title .
   }
   SERVICE wikibase:label { 
     bd:serviceParam wikibase:language "en". 
-    ?val rdfs:label ?label .
-    ?ref rdfs:label ?labelRef .
+    ?targetId rdfs:label ?targetLabel .
+    # ?ref rdfs:label ?labelRef . # refs (retrieved, referenceURL, publisher, title) labels may be needed in the future
   }
 }
-LIMIT 1000
-
 
 # --------------------------------------------------------------------------- #
 #                 Select twinned cities names with all details                #
