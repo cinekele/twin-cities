@@ -70,6 +70,27 @@ class TwinCitiesGraph:
         if (subject, predicate, object_) not in self.graph:
             self.graph.add((subject, predicate, object_))
 
+    def get_cities(self) -> list[{str: str}]:
+        cities = []
+        for city_url in self.graph.subjects(RDF.type, self.twin_cities.City):
+            cities.append({
+                "url": city_url.toPython(),
+                "name": self.graph.value(city_url, RDFS.label).toPython(),
+                "country": self.graph.value(city_url, self.twin_cities.country).toPython()
+            })
+        return cities
+
+    def get_twins(self, city_url: str) -> list[{str: str}]:
+        twins = []
+        for twin_url in self.graph.objects(URIRef(city_url), self.twin_cities.twin):
+            twins.append({
+                "originalCity": city_url,
+                "url": twin_url.toPython(),
+                "name": self.graph.value(twin_url, RDFS.label).toPython(),
+                "country": self.graph.value(twin_url, self.twin_cities.country).toPython()
+            })
+        return twins
+
     def serialize(self, format_: str = "turtle") -> str:
         return self.graph.serialize(format=format_)
 

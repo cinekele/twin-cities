@@ -1,10 +1,11 @@
 import dash
-import sys
 
 import os
 import sys
 
 import time
+
+from grapher.twin_cities_graph import TwinCitiesGraph
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -20,18 +21,22 @@ from dash.exceptions import PreventUpdate
 app = dash.Dash(__name__)
 
 st = time.perf_counter()
-graph = q.load_wikipedia_graph("../twin_cities.ttl")
+# graph = q.load_wikipedia_graph("../twin_cities.ttl")
+graph = TwinCitiesGraph()
+graph.load("../twin_cities.ttl")
 print(f"Loaded graph in {time.perf_counter() - st:0.2f} seconds")
 
 # List of city URLs for the dropdown
 st = time.perf_counter()
-city_urls_pd = q.get_available_cities_urls(graph)
+# city_urls_pd = q.get_available_cities_urls(graph)
+cities = graph.get_cities()
 print(f"Got city URLs in {time.perf_counter() - st:0.2f} seconds")
 
-city_urls_pd["label"] = city_urls_pd["city_name"] + ', ' + city_urls_pd["city_country"]
-city_urls_pd["value"] = city_urls_pd["city_url"]
+# city_urls_pd["label"] = city_urls_pd["city_name"] + ', ' + city_urls_pd["city_country"]
+# city_urls_pd["value"] = city_urls_pd["city_url"]
 
-city_urls = city_urls_pd[["label", "value"]].to_dict("records")
+# city_urls = city_urls_pd[["label", "value"]].to_dict("records")
+city_urls = [{"label": city["name"] + ', ' + city["country"], "value": city["url"]} for city in cities]
 
 
 app.layout = html.Div([
@@ -66,25 +71,70 @@ def update_output(n_clicks, city_url):
         return None  # Not clicked yet
 
     st = time.perf_counter()
-    df = q.get_wikidata_twin_data(city_url)
-    print(f"Ran query in {time.perf_counter() - st:0.2f} seconds")
-    # print(df)
+    data_wikidata = sorted(q.get_wikidata_twin_data(city_url), key=lambda x: x['targetLabel'])
+    print(f"Ran query (wikidata) in {time.perf_counter() - st:0.2f} seconds")
+    st = time.perf_counter()
+    data_wikipedia = sorted(graph.get_twins(city_url), key=lambda x: x['name'])
+    print(f"Ran query (wikipedia) in {time.perf_counter() - st:0.2f} seconds")
+    # print(data_wikidata)
+    # print(data_wikipedia)
 
-    # Create a nested list with hidden details
-    # TODO: two columns and background (or some other way) to show 
-    #       diff between wikipedia and wikidata results (css classes same/different-a/different-b like in git green/red)
-    nested_list = html.Ul([
-        html.Li([
+    results = []
+    i = 0
+    j = 0
+    while i < len(data_wikidata) and j < len(data_wikipedia):
+        if data_wikidata[i]['targetLabel'] < data_wikipedia[j]['name']:
+            results.append({
+                "wikidata": data_wikidata[i],
+                "wikipedia": None
+            })
+            i += 1
+        elif data_wikidata[i]['targetLabel'] > data_wikipedia[j]['name']:
+            results.append({
+                "wikidata": None,
+                "wikipedia": data_wikipedia[j]
+            })
+            j += 1
+        else:
+            results.append({
+                "wikidata": data_wikidata[i],
+                "wikipedia": data_wikipedia[j]
+            })
+            i += 1
+            j += 1
+
+    listing = html.Ul([
+        html.Li(
             html.Details([
-                html.Summary(df.iloc[i]['targetLabel']),
+                html.Summary(result['wikidata']['targetLabel'] if result['wikidata'] is not None else result['wikipedia']['name']),
                 html.Ul([
-                    html.Li(f"{col}: {df.iloc[i][col]}") for col in df.columns
+                    html.Table([
+                        html.Thead(
+                            html.Tr(["wikidata", "wikipedia"])
+                        ),
+                        html.Tbody([
+                            html.Tr([
+                                html.Td(
+                                    html.Ul([
+                                        html.Li(f"{key}: {value}") for key, value in result['wikidata'].items()
+                                    ]) if result['wikidata'] is not None else None
+                                ),
+                                html.Td(
+                                    html.Ul([
+                                        html.Li(f"{key}: {value}") for key, value in result['wikipedia'].items()
+                                    ]) if result['wikipedia'] is not None else None
+                                )
+                            ]),
+                        ])
+                    ])
                 ])
             ])
-        ]) for i in range(min(len(df), 20))
+        ) for result in results
     ])
+    return listing
 
-    return nested_list
+    # TODO: two columns and background (or some other way) to show 
+    #       diff between wikipedia and wikidata results (css classes same/different-a/different-b like in git green/red)
 
 if __name__ == '__main__':
     app.run_server(debug=True)
