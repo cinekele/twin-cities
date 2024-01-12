@@ -73,23 +73,51 @@ class TwinCitiesGraph:
     def get_cities(self) -> list[{str: str}]:
         cities = []
         for city_url in self.graph.subjects(RDF.type, self.twin_cities.City):
-            cities.append({
-                "url": city_url.toPython(),
-                "name": self.graph.value(city_url, RDFS.label).toPython(),
-                "country": self.graph.value(city_url, self.twin_cities.country).toPython()
-            })
+            if self.graph.value(city_url, self.twin_cities.twin) is None:
+                continue
+            city = {
+                "url": city_url,
+                "name": self.graph.value(city_url, RDFS.label),
+                "country": self.graph.value(city_url, self.twin_cities.country)
+            }
+            for key, value in city.items():
+                city[key] = value.toPython() if value is not None else None
+            cities.append(city)
         return cities
 
     def get_twins(self, city_url: str) -> list[{str: str}]:
         twins = []
         for twin_url in self.graph.objects(URIRef(city_url), self.twin_cities.twin):
-            twins.append({
-                "originalCity": city_url,
-                "url": twin_url.toPython(),
-                "name": self.graph.value(twin_url, RDFS.label).toPython(),
-                "country": self.graph.value(twin_url, self.twin_cities.country).toPython()
-            })
+            twin = {
+                "url": twin_url,
+                "name": self.graph.value(twin_url, RDFS.label),
+                "country": self.graph.value(twin_url, self.twin_cities.country),
+                "sourcePage": self.graph.value(twin_url, self.twin_cities.sourcePage),
+                "sourceType": self.graph.value(twin_url, self.twin_cities.sourceType),
+                "wikiText": self.graph.value(twin_url, self.twin_cities.wikiText)
+            }
+            for key, value in twin.items():
+                twin[key] = value.toPython() if value is not None else None
+            twins.append(twin)
+
         return twins
+
+    def get_references(self, city_url: str) -> list[{str: str}]:
+        refs = []
+        for ref_url in self.graph.objects(URIRef(city_url), self.twin_cities.reference):
+            ref = {
+                "name": self.graph.value(ref_url, RDFS.label),
+                "url": self.graph.value(ref_url, self.twin_cities.url),
+                "author": self.graph.value(ref_url, self.twin_cities.author),
+                "publisher": self.graph.value(ref_url, self.twin_cities.publisher),
+                "language": self.graph.value(ref_url, self.twin_cities.language),
+                "accessDate": self.graph.value(ref_url, self.twin_cities.accessDate),
+                "date": self.graph.value(ref_url, self.twin_cities.date)
+            }
+            for key, value in ref.items():
+                ref[key] = value.toPython() if value is not None else None
+            refs.append(ref)
+        return refs
 
     def serialize(self, format_: str = "turtle") -> str:
         return self.graph.serialize(format=format_)
