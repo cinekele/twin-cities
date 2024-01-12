@@ -73,7 +73,7 @@ class TwinCitiesGraph:
     def get_cities(self) -> list[{str: str}]:
         cities = []
         for city_url in self.graph.subjects(RDF.type, self.twin_cities.City):
-            if self.graph.value(city_url, self.twin_cities.twin) is None:
+            if self.graph.value(city_url, self.twin_cities.twin) is None:  # TODO: something wrong
                 continue
             city = {
                 "url": city_url,
@@ -111,7 +111,7 @@ class TwinCitiesGraph:
                 "author": self.graph.value(ref_url, self.twin_cities.author),
                 "publisher": self.graph.value(ref_url, self.twin_cities.publisher),
                 "language": self.graph.value(ref_url, self.twin_cities.language),
-                "accessDate": self.graph.value(ref_url, self.twin_cities.accessDate),
+                "accessDate": self.graph.value(ref_url, self.twin_cities.accessDate),  # TODO: multiple
                 "date": self.graph.value(ref_url, self.twin_cities.date)
             }
             for key, value in ref.items():
