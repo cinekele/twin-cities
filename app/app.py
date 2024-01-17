@@ -1,10 +1,11 @@
 import os
 import sys
 import time
-import dash
-from dash import dcc, html, dash_table
+import urllib.parse
+from dash import Dash, dcc, html, dash_table
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
+import dash_daq as daq
 
 from grapher.twin_cities_graph import TwinCitiesGraph
 from wikidata import queries as q
@@ -13,7 +14,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-app = dash.Dash(__name__)
+app = Dash(__name__)
 
 
 def load_graph() -> TwinCitiesGraph:
@@ -24,7 +25,7 @@ def load_graph() -> TwinCitiesGraph:
     return g
 
 
-graph = load_graph()
+graph: TwinCitiesGraph | None = None
 
 
 def load_cities() -> list[dict[str, str]]:
@@ -35,17 +36,26 @@ def load_cities() -> list[dict[str, str]]:
     return [{"label": city["name"] + ', ' + city["country"], "value": city["url"]} for city in cities]
 
 
-city_urls = load_cities()
+city_urls: list[dict[str, str]] = []
 
 
-def load_twins_wikidata(city_url: str) -> list[dict[str, str]]:
+def load_twins_wikidata(city_url: str) -> list[dict[str, str | list[str]]]:
     st = time.perf_counter()
-    data_wikidata = sorted(q.get_wikidata_twin_data(city_url), key=lambda x: x['targetLabel'])
+    raw = sorted(q.get_wikidata_twin_data(city_url), key=lambda x: x['targetLabel'])
     print(f"Ran query (wikidata) in {time.perf_counter() - st:0.2f} seconds")
     # remap keys
-    for i in range(len(data_wikidata)):
-        data_wikidata[i]['url'] = data_wikidata[i].pop('targetId')
-        data_wikidata[i]['name'] = data_wikidata[i].pop('targetLabel')
+    data_wikidata = []
+    for i in range(len(raw)):
+        raw[i]['url'] = urllib.parse.unquote(raw[i].pop('targetUrl'))
+        raw[i]['name'] = raw[i].pop('targetLabel')
+
+        if i > 0 and raw[i]['targetId'] == raw[i - 1]['targetId'] and 'referenceUrl' in raw[i]:
+            data_wikidata[-1]['references'].append(raw[i]['referenceUrl'])
+        else:
+            data_wikidata.append(raw[i])
+            data_wikidata[-1]['references'] = []
+            if 'referenceUrl' in data_wikidata[-1]:
+                data_wikidata[-1]['references'].append(data_wikidata[-1].pop('referenceUrl'))
     return data_wikidata
 
 
@@ -56,34 +66,97 @@ def load_twins_wikipedia(city_url: str) -> list[dict[str, str]]:
     return data_wikipedia
 
 
+def align_twins(data_wikidata: list[dict[str, str]], data_wikipedia: list[dict[str, str]]) -> list[
+    dict[str, dict[str, str]]]:
+    twins = []
+    i = 0
+    j = 0
+    while i < len(data_wikidata) and j < len(data_wikipedia):
+        if data_wikidata[i]['url'] != data_wikipedia[j]['url']:
+            if data_wikidata[i]['name'] == data_wikipedia[j]['name']:
+                twins.append({
+                    "wikidata": data_wikidata[i],
+                    "wikipedia": data_wikipedia[j]
+                })
+                i += 1
+                j += 1
+            else:
+                if data_wikidata[i]['url'] < data_wikipedia[j]['url']:
+                    twins.append({
+                        "wikidata": data_wikidata[i],
+                        "wikipedia": None
+                    })
+                    i += 1
+                elif data_wikidata[i]['url'] > data_wikipedia[j]['url']:
+                    twins.append({
+                        "wikidata": None,
+                        "wikipedia": data_wikipedia[j]
+                    })
+                    j += 1
+        else:
+            twins.append({
+                "wikidata": data_wikidata[i],
+                "wikipedia": data_wikipedia[j]
+            })
+            i += 1
+            j += 1
+    return twins
+
+
 twins_details: list[dict[str, dict[str, str]]] = []
 twins_names: list[dict[str, str]] = []
 references: list[dict[str, str]] = []
 details_names = ["name", "url"]
 
+
+def setup():
+    global graph, city_urls
+    graph = load_graph()
+    city_urls = load_cities()
+
+
+table_right_config = dict(
+    markdown_options={'html': True},
+    columns=[{"name": "property", "id": "property"},
+             {"name": "wikipedia", "id": "wikipedia", "presentation": "markdown", "type": "text"},
+             {"name": "wikidata", "id": "wikidata", "presentation": "markdown", "type": "text"}],
+    style_cell={'textAlign': 'left', 'width': '33%'},
+    style_data={'whiteSpace': 'normal', 'height': 'auto'},
+    style_table={'margin-top': '10px', 'width': '100%'},
+    css=[{'selector': 'table', 'rule': 'table-layout: fixed'},
+         {'selector': '.dash-cell div.dash-cell-value', 'rule': 'overflow-wrap: break-word'},
+         {'selector': 'p', 'rule': 'margin: 0'},
+         {'selector': 'div.dash-cell-value.cell-markdown', 'rule': 'font-family: monospace'}]
+)
+EMPTY_VALUE = ""
+
 app.layout = html.Div([
     html.Div([
         dcc.Dropdown(id='city-url', options=[], placeholder='Select a city'),
         html.Button('Run Query', id='run-button', style={'margin-top': '10px', 'margin-bottom': '10px'}),
+        daq.BooleanSwitch(id='hide-switch', on=False, style={'margin-top': '10px', 'margin-bottom': '10px'}),
         html.Div(id='output-table'),
         dash_table.DataTable(id='dash-table',
+                             columns=[{"name": i, "id": i} for i in ["wikipedia", "wikidata"]],
                              fixed_rows={'headers': True},
-                             style_cell={'textAlign': 'left'},
+                             style_cell={'textAlign': 'left', 'width': '50%'},
                              style_data_conditional=[
                                  {
                                      'if': {
-                                         'filter_query': '{wikipedia} != {wikidata}'
+                                         'filter_query': '{wikipedia} is nil || {wikidata} is nil',
                                      },
-                                     'backgroundColor': 'lightpink',
+                                     'backgroundColor': 'rgb(255, 175, 175)',
                                  }
                              ]),
     ],
         style={'height': '100%', 'width': '40%', 'display': 'inline-block', 'vertical-align': 'top'}),
     html.Div([
-        dash_table.DataTable(id='dash-table-details', style_cell={'textAlign': 'left'}, style_table={'margin-top': '10px'}),
-        dash_table.DataTable(id='dash-table-refs', style_cell={'textAlign': 'left'}, style_table={'margin-top': '10px'}),
-        ],
-        style={'width': '40%', 'display': 'inline-block', 'margin-left': '5%'}
+        dash_table.DataTable(id='dash-table-details',
+                             **table_right_config),
+        dash_table.DataTable(id='dash-table-refs',
+                             **table_right_config),
+    ],
+        style={'width': '50%', 'display': 'inline-block', 'margin-left': '5%'}
     )],
     style={'height': '100%', 'width': '100%'}
 )
@@ -123,8 +196,8 @@ def update_refs(active_cell, active_cell_main):
         for key, value in reference.items():
             table.append({
                 "property": key,
-                "wikipedia": value,
-                "wikidata": None
+                "wikipedia": value if key != "url" else f"<a href='{value}' target='_blank' >{value}</a>",
+                "wikidata": EMPTY_VALUE
             })
         return table
     return None
@@ -144,10 +217,15 @@ def update_details(active_cell):
     details = twins_details[row]
     table = []
     for details_name in details_names:
+        field_wikipedia = details['wikipedia'][details_name] if details['wikipedia'] is not None else None
+        field_wikidata = details['wikidata'][details_name] if details['wikidata'] is not None else None
+        if details_name == "url":
+            field_wikipedia = f"<a href='{field_wikipedia}' target='_blank' >{field_wikipedia}</a>" if field_wikipedia is not None else EMPTY_VALUE
+            field_wikidata = f"<a href='{field_wikidata}' target='_blank' >{field_wikidata}</a>" if field_wikidata is not None else EMPTY_VALUE
         table.append({
             "property": details_name,
-            "wikipedia": details['wikipedia'][details_name] if details['wikipedia'] is not None else None,
-            "wikidata": details['wikidata'][details_name] if details['wikidata'] is not None else None
+            "wikipedia": field_wikipedia,
+            "wikidata": field_wikidata
         })
     if details['wikipedia'] is not None:
         global references
@@ -156,57 +234,60 @@ def update_details(active_cell):
             table.append({
                 "property": "reference",
                 "wikipedia": reference['name'],
-                "wikidata": None
+                "wikidata": EMPTY_VALUE
+            })
+    if details['wikidata'] is not None:
+        for reference in details['wikidata']['references']:
+            table.append({
+                "property": "reference",
+                "wikipedia": EMPTY_VALUE,
+                "wikidata": reference
             })
     return table, None
+
+
+@app.callback(
+    Output('dash-table', 'data', allow_duplicate=True),
+    Input('hide-switch', 'on'),
+    prevent_initial_call=True,
+)
+def update_table_hide(on):
+    global twins_names
+    twins_names = []
+    for result in twins_details:
+        if on and result['wikidata'] is not None:
+            continue
+        twins_names.append({"wikipedia": result['wikipedia']['name'] if result['wikipedia'] is not None else None,
+                            "wikidata": result['wikidata']['name'] if result['wikidata'] is not None else None})
+    return twins_names
 
 
 @app.callback(
     Output('dash-table', 'data'),
     Output('dash-table-details', 'data'),
     Output('dash-table-refs', 'data'),
-    [Input('run-button', 'n_clicks')],
-    [dash.dependencies.State('city-url', 'value')],
+    Output('hide-switch', 'on'),
+    Input('run-button', 'n_clicks'),
+    State('city-url', 'value'),
     prevent_initial_call=True,
 )
 def update_table(n_clicks, city_url):
     if n_clicks is None:
-        return None, None, None  # Not clicked yet
+        return None, None, None, False  # Not clicked yet
 
     data_wikidata = load_twins_wikidata(city_url)
     data_wikipedia = load_twins_wikipedia(city_url)
 
     global twins_details, twins_names
-    twins_details = []
+    twins_details = align_twins(data_wikidata, data_wikipedia)
     twins_names = []
-    i = 0
-    j = 0
-    while i < len(data_wikidata) and j < len(data_wikipedia):
-        if data_wikidata[i]['name'] < data_wikipedia[j]['name']:
-            twins_details.append({
-                "wikidata": data_wikidata[i],
-                "wikipedia": None
-            })
-            i += 1
-        elif data_wikidata[i]['name'] > data_wikipedia[j]['name']:
-            twins_details.append({
-                "wikidata": None,
-                "wikipedia": data_wikipedia[j]
-            })
-            j += 1
-        else:
-            twins_details.append({
-                "wikidata": data_wikidata[i],
-                "wikipedia": data_wikipedia[j]
-            })
-            i += 1
-            j += 1
 
     for result in twins_details:
         twins_names.append({"wikipedia": result['wikipedia']['name'] if result['wikipedia'] is not None else None,
                             "wikidata": result['wikidata']['name'] if result['wikidata'] is not None else None})
-    return twins_names, None, None
+    return twins_names, None, None, False
 
 
 if __name__ == '__main__':
+    setup()
     app.run_server(debug=True)

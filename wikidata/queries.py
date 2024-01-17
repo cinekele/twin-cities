@@ -63,57 +63,60 @@ def get_wikidata_twin_data(city_url: str, endpoint_url: str = "https://query.wik
     sparql.setReturnFormat(JSON)
 
     query = """
-    PREFIX wikibase: <http://wikiba.se/ontology#>
-    PREFIX p: <http://www.wikidata.org/prop/>
-    PREFIX ps: <http://www.wikidata.org/prop/statement/>
-    PREFIX pq: <http://www.wikidata.org/prop/qualifier/>
-    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-    
-    PREFIX pr: <http://www.wikidata.org/prop/reference/>
-    
-    PREFIX schema: <http://schema.org/>
-    PREFIX prov: <http://www.w3.org/ns/prov#>
-    
-    SELECT ("{{CITY_URL}}" as ?sourceWikipediaURL) 
-      ?sourceId ?targetId ?targetLabel
-      ?starttime ?endtime
-      ?retrieved ?referenceURL ?publisher ?title
-    WHERE
-    {
-      {
-        ?sourceId ^schema:about <{{CITY_URL}}> .
-      }
-      ?sourceId p:P190 ?statement.
-      ?statement ps:P190 ?targetId.
-    
-      # rank - doesn't matter much - 3 possible values irrelevant for us
-      #?statement wikibase:rank ?rank.
-      # qualifiers
-      OPTIONAL{ ?statement pq:P580 ?starttime. }
-      OPTIONAL{ ?statement pq:P582 ?endtime. }
-      # references
-      OPTIONAL {
-        ?statement prov:wasDerivedFrom ?refnode .
-        ?refnode pr:P813 ?retrieved .
-      }
-      OPTIONAL {
-        ?statement prov:wasDerivedFrom ?refnode .
-        ?refnode pr:P854 ?referenceURL .
-      }
-      OPTIONAL {
-        ?statement prov:wasDerivedFrom ?refnode .
-        ?refnode pr:P123 ?publisher .
-      }
-      OPTIONAL {
-        ?statement prov:wasDerivedFrom ?refnode .
-        ?refnode pr:P1476 ?title .
-      }
-      SERVICE wikibase:label { 
-        bd:serviceParam wikibase:language "en". 
-        ?targetId rdfs:label ?targetLabel .
-        # ?ref rdfs:label ?labelRef . # refs (retrieved, referenceURL, publisher, title) labels may be needed in the future
-      }
-    }
+PREFIX wikibase: <http://wikiba.se/ontology#>
+PREFIX p: <http://www.wikidata.org/prop/>
+PREFIX ps: <http://www.wikidata.org/prop/statement/>
+PREFIX pq: <http://www.wikidata.org/prop/qualifier/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+PREFIX pr: <http://www.wikidata.org/prop/reference/>
+
+PREFIX schema: <http://schema.org/>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+
+SELECT ("{{CITY_URL}}" as ?sourceUrl) 
+?sourceId ?targetId ?targetUrl ?targetLabel ?starttime ?endtime ?retrieved ?referenceUrl ?publisher ?title
+WHERE
+{
+  {
+    ?sourceId ^schema:about <{{CITY_URL}}> .
+  }
+  ?sourceId p:P190 ?statement.
+  ?statement ps:P190 ?targetId.
+
+  OPTIONAL {
+    ?targetId ^schema:about ?targetUrl .
+    FILTER (REGEX (STR(?targetUrl), "://en.wikipedia"))
+  }
+
+  # rank - doesn't matter much - 3 possible values irrelevant for us
+  #?statement wikibase:rank ?rank.
+  # qualifiers
+  OPTIONAL { ?statement pq:P580 ?starttime. }
+  OPTIONAL { ?statement pq:P582 ?endtime. }
+  # references
+  OPTIONAL {
+    ?statement prov:wasDerivedFrom ?refnode .
+    ?refnode pr:P813 ?retrieved .
+  }
+  OPTIONAL {
+    ?statement prov:wasDerivedFrom ?refnode .
+    ?refnode pr:P854 ?referenceUrl .
+  }
+  OPTIONAL {
+    ?statement prov:wasDerivedFrom ?refnode .
+    ?refnode pr:P123 ?publisher .
+  }
+  OPTIONAL {
+    ?statement prov:wasDerivedFrom ?refnode .
+    ?refnode pr:P1476 ?title .
+  }
+  SERVICE wikibase:label { 
+    bd:serviceParam wikibase:language "en". 
+    ?targetId rdfs:label ?targetLabel .
+    # ?ref rdfs:label ?labelRef . # refs (retrieved, referenceUrl, publisher, title) labels may be needed in the future
+  }
+}
     """
 
     return run_query(sparql, query, city_url)
