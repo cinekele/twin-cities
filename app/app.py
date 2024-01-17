@@ -39,7 +39,7 @@ def load_cities() -> list[dict[str, str]]:
 city_urls: list[dict[str, str]] = []
 
 
-def load_twins_wikidata(city_url: str) -> list[dict[str, str | list[str]]]:
+def load_twins_wikidata(city_url: str) -> list[dict[str, str | list[dict[str, str]]]]:
     st = time.perf_counter()
     raw = sorted(q.get_wikidata_twin_data(city_url), key=lambda x: x['targetLabel'])
     print(f"Ran query (wikidata) in {time.perf_counter() - st:0.2f} seconds")
@@ -52,10 +52,14 @@ def load_twins_wikidata(city_url: str) -> list[dict[str, str | list[str]]]:
         if i > 0 and raw[i]['targetId'] == raw[i - 1]['targetId'] and 'referenceUrl' in raw[i]:
             data_wikidata[-1]['references'].append(raw[i]['referenceUrl'])
         else:
-            data_wikidata.append(raw[i])
+            data_wikidata.append({**raw[i]})
             data_wikidata[-1]['references'] = []
             if 'referenceUrl' in data_wikidata[-1]:
-                data_wikidata[-1]['references'].append(data_wikidata[-1].pop('referenceUrl'))
+                data_wikidata[-1]['references'].append({
+                    "url": data_wikidata[-1].pop('referenceUrl'),
+                    "name": data_wikidata[-1].pop('referenceName') if 'referenceName' in data_wikidata[-1] else None,
+                    "publisher": data_wikidata[-1].pop('referencePublisher') if 'referencePublisher' in data_wikidata[-1] else None,
+                })
     return data_wikidata
 
 
@@ -105,7 +109,7 @@ def align_twins(data_wikidata: list[dict[str, str]], data_wikipedia: list[dict[s
 
 twins_details: list[dict[str, dict[str, str]]] = []
 twins_names: list[dict[str, str]] = []
-references: list[dict[str, str]] = []
+references_wikipedia: list[dict[str, str]] = []
 details_names = ["name", "url"]
 
 
@@ -189,17 +193,32 @@ def update_refs(active_cell, active_cell_main):
 
     row_main = active_cell_main['row']
     row = active_cell['row']
-    details = twins_details[row_main]['wikipedia']
-    if details is not None and row >= len(details_names):
-        reference = references[row - len(details_names)]
-        table = []
-        for key, value in reference.items():
-            table.append({
-                "property": key,
-                "wikipedia": value if key != "url" else f"<a href='{value}' target='_blank' >{value}</a>",
-                "wikidata": EMPTY_VALUE
-            })
-        return table
+    details = twins_details[row_main]
+    if row >= len(details_names):
+        if row - len(details_names) < len(references_wikipedia):
+            reference = references_wikipedia[row - len(details_names)]
+            table = []
+            for key, value in reference.items():
+                if value is None:
+                    continue
+                table.append({
+                    "property": key,
+                    "wikipedia": value if key != "url" else f"<a href='{value}' target='_blank' >{value}</a>",
+                    "wikidata": EMPTY_VALUE
+                })
+            return table
+        else:
+            reference = details['wikidata']['references'][row - len(details_names) - len(references_wikipedia)]
+            table = []
+            for key, value in reference.items():
+                if value is None:
+                    continue
+                table.append({
+                    "property": key,
+                    "wikipedia": EMPTY_VALUE,
+                    "wikidata": value if key != "url" else f"<a href='{value}' target='_blank' >{value}</a>"
+                })
+            return table
     return None
 
 
@@ -224,24 +243,26 @@ def update_details(active_cell):
             field_wikidata = f"<a href='{field_wikidata}' target='_blank' >{field_wikidata}</a>" if field_wikidata is not None else EMPTY_VALUE
         table.append({
             "property": details_name,
-            "wikipedia": field_wikipedia,
-            "wikidata": field_wikidata
+            "wikipedia": field_wikipedia if field_wikipedia is not None else EMPTY_VALUE,
+            "wikidata": field_wikidata if field_wikidata is not None else EMPTY_VALUE
         })
+    global references_wikipedia
     if details['wikipedia'] is not None:
-        global references
-        references = graph.get_references(details['wikipedia']['url'])
-        for reference in references:
+        references_wikipedia = graph.get_references(details['wikipedia']['url'])
+        for reference in references_wikipedia:
             table.append({
                 "property": "reference",
                 "wikipedia": reference['name'],
                 "wikidata": EMPTY_VALUE
             })
+    else:
+        references_wikipedia = []
     if details['wikidata'] is not None:
         for reference in details['wikidata']['references']:
             table.append({
                 "property": "reference",
                 "wikipedia": EMPTY_VALUE,
-                "wikidata": reference
+                "wikidata": reference['name'] if reference['name'] is not None else reference['url']
             })
     return table, None
 

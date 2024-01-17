@@ -75,7 +75,7 @@ PREFIX schema: <http://schema.org/>
 PREFIX prov: <http://www.w3.org/ns/prov#>
 
 SELECT ("{{CITY_URL}}" as ?sourceUrl) 
-?sourceId ?targetId ?targetUrl ?targetLabel ?starttime ?endtime ?retrieved ?referenceUrl ?publisher ?title
+?sourceId ?targetId ?targetUrl ?targetLabel ?starttime ?endtime ?retrieved ?referenceUrl ?referencePublisher ?referenceName
 WHERE
 {
   {
@@ -105,16 +105,16 @@ WHERE
   }
   OPTIONAL {
     ?statement prov:wasDerivedFrom ?refnode .
-    ?refnode pr:P123 ?publisher .
+    ?refnode pr:P123 ?referencePublisher .
   }
   OPTIONAL {
     ?statement prov:wasDerivedFrom ?refnode .
-    ?refnode pr:P1476 ?title .
+    ?refnode pr:P1476 ?referenceName .
   }
   SERVICE wikibase:label { 
     bd:serviceParam wikibase:language "en". 
     ?targetId rdfs:label ?targetLabel .
-    # ?ref rdfs:label ?labelRef . # refs (retrieved, referenceUrl, publisher, title) labels may be needed in the future
+    # ?ref rdfs:label ?labelRef . # refs (retrieved, referenceUrl, referencePublisher, referenceName) labels may be needed in the future
   }
 }
     """

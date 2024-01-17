@@ -111,10 +111,13 @@ class TwinCitiesGraph:
                 "author": self.graph.value(ref_url, self.twin_cities.author),
                 "publisher": self.graph.value(ref_url, self.twin_cities.publisher),
                 "language": self.graph.value(ref_url, self.twin_cities.language),
-                "accessDate": self.graph.value(ref_url, self.twin_cities.accessDate),  # TODO: multiple
+                "accessDate": list(self.graph.objects(ref_url, self.twin_cities.accessDate)),
                 "date": self.graph.value(ref_url, self.twin_cities.date)
             }
             for key, value in ref.items():
+                if key == "accessDate":
+                    ref[key] = " ".join([x.toPython() for x in value]) if value is not None else None
+                    continue
                 ref[key] = value.toPython() if value is not None else None
             refs.append(ref)
         return refs
