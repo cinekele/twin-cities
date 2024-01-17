@@ -73,7 +73,7 @@ class TwinCitiesGraph:
         if (subject, predicate, object_) not in self.graph:
             self.graph.add((subject, predicate, object_))
 
-    def get_cities(self) -> list[{str: str}]:
+    def get_cities(self) -> list[dict[str, str]]:
         cities = []
         for city_url in self.graph.subjects(RDF.type, self.twin_cities.City):
             if self.graph.value(city_url, self.twin_cities.twin) is None:  # TODO: something wrong
@@ -88,7 +88,7 @@ class TwinCitiesGraph:
             cities.append(city)
         return cities
 
-    def get_twins(self, city_url: str) -> list[{str: str}]:
+    def get_twins(self, city_url: str) -> list[dict[str, str]]:
         twins = []
         for twin_url in self.graph.objects(URIRef(city_url), self.twin_cities.twin):
             twin = {
@@ -105,7 +105,7 @@ class TwinCitiesGraph:
 
         return twins
 
-    def get_references(self, city_url: str) -> list[{str: str}]:
+    def get_references(self, city_url: str) -> list[dict[str, str]]:
         refs = []
         for ref_url in self.graph.objects(URIRef(city_url), self.twin_cities.reference):
             ref = {
