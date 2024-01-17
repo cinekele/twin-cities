@@ -23,11 +23,13 @@ class TwinCitiesGraph:
 
     def add_cities(self, cities: list[City]):
         for city in cities:
-            self._add_city(city.wiki_url, city.name, city.country, city.wiki_text, city.source_page, city.source_type, city.ref)
+            self._add_city(city.wiki_url, city.name, city.country, city.wiki_text, city.source_page, city.source_type,
+                           [])
             for twin in city.twin_cities:
-                self._add_twin(city.wiki_url, twin)
+                self._add_twin(city.wiki_url, twin, additional_references=city.ref)
 
-    def _add_city(self, url: str, name: str, country: str, wiki_text: str, source_page: str | None, source_type: str | None, references: list[Reference]):
+    def _add_city(self, url: str, name: str, country: str, wiki_text: str, source_page: str | None,
+                  source_type: str | None, references: list[Reference]):
         url = URIRef(url)
         self._add_triple(url, RDF.type, self.twin_cities.City)
         self._add_triple(url, RDFS.label, Literal(name))
@@ -38,9 +40,10 @@ class TwinCitiesGraph:
         for reference in references:
             self._add_reference(url, reference)
 
-    def _add_twin(self, city_url: str, twin: TwinCitiesAgreement):
+    def _add_twin(self, city_url: str, twin: TwinCitiesAgreement, additional_references: list[Reference]):
         city_url = URIRef(city_url)
-        self._add_city(twin.wiki_url, twin.second_city, twin.second_country, twin.wiki_text, None, None, twin.refs)
+        self._add_city(twin.wiki_url, twin.second_city, twin.second_country, twin.wiki_text, None, None,
+                       twin.refs + additional_references)
         twin_url = URIRef(twin.wiki_url)
         self._add_triple(city_url, self.twin_cities.twin, twin_url)
 
