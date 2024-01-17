@@ -57,7 +57,7 @@ class TwinCitiesGraph:
             self._add_triple(ref, RDF.type, self.twin_cities.Reference)
             self._add_triple(ref, self.twin_cities.url, Literal(reference.url))
 
-        self._add_triple(ref, self.twin_cities.author, Literal(reference.website))
+        self._add_triple(ref, self.twin_cities.website, Literal(reference.website))
         self._add_triple(ref, RDFS.label, Literal(reference.title))
         self._add_triple(ref, self.twin_cities.publisher, Literal(reference.publisher))
         self._add_triple(ref, self.twin_cities.language, Literal(reference.language))
@@ -111,7 +111,7 @@ class TwinCitiesGraph:
             ref = {
                 "name": self.graph.value(ref_url, RDFS.label),
                 "url": self.graph.value(ref_url, self.twin_cities.url),
-                "author": self.graph.value(ref_url, self.twin_cities.author),
+                "website": self.graph.value(ref_url, self.twin_cities.website),
                 "publisher": self.graph.value(ref_url, self.twin_cities.publisher),
                 "language": self.graph.value(ref_url, self.twin_cities.language),
                 "accessDate": list(self.graph.objects(ref_url, self.twin_cities.accessDate)),

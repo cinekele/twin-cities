@@ -147,7 +147,22 @@ app.layout = html.Div([
                              style_data_conditional=[
                                  {
                                      'if': {
-                                         'filter_query': '{wikipedia} is nil || {wikidata} is nil',
+                                         'filter_query': '{wikipedia} is nil',
+                                         'column_id': 'wikipedia',
+                                     },
+                                     'backgroundColor': 'rgb(255, 175, 175)',
+                                 },
+                                 {
+                                     'if': {
+                                         'filter_query': '{wikidata} is nil',
+                                         'column_id': 'wikidata',
+                                     },
+                                     'backgroundColor': 'rgb(175, 255, 175)',
+                                 },
+                                 {
+                                     'if': {
+                                         'filter_query': '!({wikipedia} is nil) && {wikidata} is nil',
+                                         'column_id': 'wikipedia',
                                      },
                                      'backgroundColor': 'rgb(255, 175, 175)',
                                  }
@@ -159,11 +174,45 @@ app.layout = html.Div([
                              **table_right_config),
         dash_table.DataTable(id='dash-table-refs',
                              **table_right_config),
+        html.Button('Update Wikidata', id='update-button', hidden=True, disabled=False, style={'margin-top': '10px', 'margin-bottom': '10px'})
     ],
         style={'width': '50%', 'display': 'inline-block', 'margin-left': '5%'}
     )],
     style={'height': '100%', 'width': '100%'}
 )
+
+
+@app.callback(
+    Output('update-button', 'disabled', allow_duplicate=True),
+    Input('update-button', 'n_clicks'),
+    State('city-url', 'value'),
+    State('dash-table', 'active_cell'),
+    prevent_initial_call=True,
+)
+def query(n_clicks, city_url, active_cell):
+    if n_clicks is None or city_url is None or active_cell is None:
+        return False
+
+    source_id = None
+    for details in twins_details:
+        if details['wikidata'] is not None:
+            source_id = details['wikidata']['sourceId']
+            break
+
+    row = active_cell['row']
+    details = twins_details[row]
+
+    update_object = {
+        "sourceUrl": city_url,
+        "sourceId": source_id,
+        "twin": {
+            **details['wikipedia'],
+            "references": references_wikipedia
+        }
+    }
+    print(update_object)
+    # TODO: call query
+    return True
 
 
 @app.callback(
@@ -225,12 +274,14 @@ def update_refs(active_cell, active_cell_main):
 @app.callback(
     Output('dash-table-details', 'data', allow_duplicate=True),
     Output('dash-table-refs', 'data', allow_duplicate=True),
+    Output('update-button', 'hidden', allow_duplicate=True),
+    Output('update-button', 'disabled', allow_duplicate=True),
     Input('dash-table', 'active_cell'),
     prevent_initial_call=True,
 )
 def update_details(active_cell):
     if active_cell is None:
-        return None, None
+        return None, None, True, False
 
     row = active_cell['row']
     details = twins_details[row]
@@ -264,7 +315,11 @@ def update_details(active_cell):
                 "wikipedia": EMPTY_VALUE,
                 "wikidata": reference['name'] if reference['name'] is not None else reference['url']
             })
-    return table, None
+
+    button_hidden = True
+    if twins_names[row]['wikipedia'] is not None and twins_names[row]['wikidata'] is None:
+        button_hidden = False
+    return table, None, button_hidden, False
 
 
 @app.callback(
@@ -288,13 +343,15 @@ def update_table_hide(on):
     Output('dash-table-details', 'data'),
     Output('dash-table-refs', 'data'),
     Output('hide-switch', 'on'),
+    Output('update-button', 'hidden'),
+    Output('update-button', 'disabled'),
     Input('run-button', 'n_clicks'),
     State('city-url', 'value'),
     prevent_initial_call=True,
 )
 def update_table(n_clicks, city_url):
     if n_clicks is None:
-        return None, None, None, False  # Not clicked yet
+        return None, None, None, False, True, False  # Not clicked yet
 
     data_wikidata = load_twins_wikidata(city_url)
     data_wikipedia = load_twins_wikipedia(city_url)
@@ -306,7 +363,7 @@ def update_table(n_clicks, city_url):
     for result in twins_details:
         twins_names.append({"wikipedia": result['wikipedia']['name'] if result['wikipedia'] is not None else None,
                             "wikidata": result['wikidata']['name'] if result['wikidata'] is not None else None})
-    return twins_names, None, None, False
+    return twins_names, None, None, False, True, False
 
 
 if __name__ == '__main__':
