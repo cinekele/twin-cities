@@ -406,7 +406,7 @@ def callbacks(_app: Dash):
         if selected_rows is None or len(selected_rows) == 0:
             return None, None, True, False
 
-        row = active_cell['row']
+        row = selected_rows[0]
         name = twins_names[row]
         details = twins_details[name['idx']]
 
