@@ -121,6 +121,40 @@ WHERE
 
     return run_query(sparql, query, city_url)
 
+
+def extract_id_from_url(city_url: str, endpoint_url: str = "https://query.wikidata.org/sparql") -> list[str]:
+    """
+    Extracts the city ID from a given city URL.
+
+    Parameters
+    ----------
+    city_url : str
+        The city URL to extract the city ID from.
+
+    Returns
+    -------
+    str
+        The extracted city ID.
+
+    Examples
+    --------
+    >>> city_url = "https://en.wikipedia.org/wiki/Radom"
+    >>> city_id = extract_id_from_url(city_url)
+    """
+
+    query = """
+    SELECT ?id
+    WHERE
+    {
+      ?id ^schema:about <{{CITY_URL}}> .
+    }
+    """
+    sparql = SPARQLWrapper(endpoint_url)
+    sparql.setReturnFormat(JSON)
+
+    results = run_query(sparql=sparql, query=query, city_url=city_url)
+    return [item['id'].split('/')[-1] for item in results]
+
 # def load_wikipedia_graph(filename: str) -> Graph:
 #     """
 #     Loads a graph from a file.
