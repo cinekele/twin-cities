@@ -79,7 +79,7 @@ class Publisher:
             raise ValueError('No valid date format found')
 
         date = convert_string_to_date(date_string)
-        date_iso = date.strftime("+%Y-%m-%d'T'%H:%M:%S'Z'")
+        date_iso = date.strftime("+%Y-%m-%dT%H:%M:%SZ")
 
         return wdi_core.WDTime(time=date_iso, prop_nr=self.PROPS["retrieved"], precision=11, is_reference=True)
 
@@ -102,9 +102,9 @@ class Publisher:
         """
 
         reference = []
-        if data.get("retrieved") is not None:
-            reference.append(self._parse_date(data["retrieved"]))
-        if data.get("referenceURL") is not None:
+        if (access_data := data.get("accessDate")) is not None:
+            reference.append(self._parse_date(access_data))
+        if (referenceURL := data.get("referenceURL")) is not None:
             reference.append(
                 wdi_core.WDUrl(value=data["referenceURL"], prop_nr=self.PROPS["referenceURL"], is_reference=True))
         if data.get("title") is not None:
@@ -119,20 +119,21 @@ class Publisher:
     def _update(self, item: wdi_core.WDItemEngine, data: dict) -> None:
         twin = data["twin"]
         target_id = data["targetId"]
-        reference = [self._create_reference(ref) for ref in twin["reference"]]
+        references = [self._create_reference(ref) for ref in twin["references"]]
         twin_city = wdi_core.WDItemID(value=target_id, prop_nr=self.PROPS["twin_city"],
-                                      references=[reference])
+                                      references=references)
         new_item = wdi_core.WDItemEngine(data=[twin_city], wd_item_id=item.wd_item_id)
         wdi_helpers.try_write(new_item, item.wd_item_id, record_prop=self.PROPS['twin_city'],
                               login=self.login, edit_summary=f"Added twin city {twin['name']}")
 
     def update(self, data: dict, two_sided: bool = True):
-        source_id = data.get("sourceId").split("/")[-1] or extract_id_from_url(data["sourceUrl"])[0]
+        source_id = data.get("sourceId").split("/")[-1] if "sourceId" in data else extract_id_from_url(data["sourceUrl"])[0]
         target_id = extract_id_from_url(data["twin"]["url"])[0]
         data["targetId"] = target_id
         item = self.load(source_id)
         self._update(item, data)
         if two_sided:
+            data["targetId"] = source_id
             item = self.load(target_id)
             self._update(item, data)
 
@@ -140,38 +141,40 @@ class Publisher:
 if __name__ == '__main__':
     publisher = Publisher()
     data = {
-        "sourceUrl": "https://en.wikipedia.org/wiki/Marzahn-Hellersdorf",
+        "sourceUrl": "https://en.wikipedia.org/wiki/Lichtenberg",
+        "sourceId": "http://www.wikidata.org/entity/Q329609",
         "twin": {
-            "url": "https://en.wikipedia.org/wiki/Tychy",
-            "name": "Tychy",
-            "country": "Poland",
-            "sourcePage": "List of twin towns and sister cities in Poland",
-            "sourceType": "country",
-            "wikiText": "Tychy",
-            "references": [
-                {
-                    "name": "Miasta partnerskie",
-                    "url": "https://umtychy.pl/artykul/108/miasta-partnerskie",
-                    "website": None,
-                    "publisher": "Tychy",
-                    "language": "pl",
-                    "accessDate": "2019-09-21",
-                    "date": None
-                }
-            ]
+            "url": "https://en.wikipedia.org/wiki/Hoàn_Kiếm_district",
+                # <https://en.wikipedia.org/wiki/Hoàn_Kiếm_district>
+            "name": "Hoàn Kiếm (Hanoi)",
+            "country": "Vietnam",
+            "sourcePage": None,
+            "sourceType": None,
+            "wikiText": "Hoàn Kiếm District",
+            "references": []
         }
     }
 
-    # {
-    #     "sourceUrl": "https://en.wikipedia.org/wiki/Lichtenberg",
-    #     "sourceId": "http://www.wikidata.org/entity/Q329609",
+    #  {
+    #     "sourceUrl": "https://en.wikipedia.org/wiki/Marzahn-Hellersdorf",
     #     "twin": {
-    #         "url": "https://en.wikipedia.org/wiki/Hoàn_Kiếm_District",
-    #         "name": "Hoàn Kiếm (Hanoi)",
-    #         "country": "Vietnam",
-    #         "sourcePage": None,
-    #         "sourceType": None,
-    #         "wikiText": "Hoàn Kiếm District",
-    #         "references": []
+    #         "url": "https://en.wikipedia.org/wiki/Tychy",
+    #         "name": "Tychy",
+    #         "country": "Poland",
+    #         "sourcePage": "List of twin towns and sister cities in Poland",
+    #         "sourceType": "country",
+    #         "wikiText": "Tychy",
+    #         "references": [
+    #             {
+    #                 "name": "Miasta partnerskie",
+    #                 "url": "https://umtychy.pl/artykul/108/miasta-partnerskie",
+    #                 "publisher": "Tychy",
+    #                 "language": "pl",
+    #                 "accessDate": "2019-09-21",
+    #                 "date": None
+    #             }
+    #         ]
     #     }
     # }
+    publisher.update(data)
+
