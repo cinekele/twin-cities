@@ -127,6 +127,15 @@ table_right_config = dict(
     style_cell={'textAlign': 'left', 'width': '33%'},
     style_data={'whiteSpace': 'normal', 'height': 'auto'},
     style_table={'margin-top': '10px', 'width': '100%'},
+    style_data_conditional=[
+        {
+            'if': {
+                'state': 'selected',
+            },
+            'backgroundColor': 'rgba(75, 75, 255, 0.2)',
+            'border': '1px solid rgb(75, 75, 255)',
+        }
+    ],
     css=[{'selector': 'table', 'rule': 'table-layout: fixed'},
          {'selector': '.dash-cell div.dash-cell-value', 'rule': 'overflow-wrap: break-word'},
          {'selector': 'p', 'rule': 'margin: 0'},
@@ -150,21 +159,28 @@ app.layout = html.Div([
                                          'filter_query': '{wikipedia} is nil',
                                          'column_id': 'wikipedia',
                                      },
-                                     'backgroundColor': 'rgb(255, 175, 175)',
+                                     'backgroundColor': 'rgb(255, 175, 175, 0.5)',
                                  },
                                  {
                                      'if': {
                                          'filter_query': '{wikidata} is nil',
                                          'column_id': 'wikidata',
                                      },
-                                     'backgroundColor': 'rgb(175, 255, 175)',
+                                     'backgroundColor': 'rgb(175, 255, 175, 0.5)',
                                  },
                                  {
                                      'if': {
                                          'filter_query': '!({wikipedia} is nil) && {wikidata} is nil',
                                          'column_id': 'wikipedia',
                                      },
-                                     'backgroundColor': 'rgb(255, 175, 175)',
+                                     'backgroundColor': 'rgba(255, 175, 175, 0.5)',
+                                 },
+                                 {
+                                     'if': {
+                                         'state': 'selected',
+                                     },
+                                     'backgroundColor': 'rgba(75, 75, 255, 0.2)',
+                                     'border': '1px solid rgb(75, 75, 255)',
                                  }
                              ]),
     ],
