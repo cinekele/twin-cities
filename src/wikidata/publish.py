@@ -122,20 +122,27 @@ class Publisher:
                                       references=references)
         new_item = wdi_core.WDItemEngine(data=[twin_city], wd_item_id=item.wd_item_id)
         result = wdi_helpers.try_write(new_item, item.wd_item_id, record_prop=self.PROPS['twin_city'],
-                              login=self.login, edit_summary=f"Added twin city {twin['name']}")
+                                       login=self.login, edit_summary=f"Added twin city {twin['name']}")
         if isinstance(result, Exception):
             raise Exception(result.wd_error_msg["error"]["info"])
         return result
 
+    def get_proper_id(self, url: str) -> str:
+        ids = extract_id_from_url(url)
+        if len(ids) == 0:
+            raise Exception("ID in Wikidata not found")
+        return ids[0]
+
     def update(self, data: dict, two_sided: bool = True) -> bool:
-        source_id =data.get("sourceId")
-        source_id = source_id.split("/")[-1] if source_id is not None else extract_id_from_url(data["sourceUrl"])[0]
-        target_id = extract_id_from_url(data["twin"]["url"])[0]
+        source_id = data.get("sourceId")
+        source_id = source_id.split("/")[-1] if source_id is not None else self.get_proper_id(data["sourceUrl"])
+        target_id = self.get_proper_id(data["twin"]["url"])
         data["targetId"] = target_id
         item = self.load(source_id)
         self._update(item, data)
         if two_sided:
             data["targetId"] = source_id
+            data["twin"]["name"] = item.get_label()
             item = self.load(target_id)
             self._update(item, data)
         return True
@@ -165,26 +172,4 @@ if __name__ == '__main__':
         }
     }
 
-    #  {
-    #     "sourceUrl": "https://en.wikipedia.org/wiki/Marzahn-Hellersdorf",
-    #     "twin": {
-    #         "url": "https://en.wikipedia.org/wiki/Tychy",
-    #         "name": "Tychy",
-    #         "country": "Poland",
-    #         "sourcePage": "List of twin towns and sister cities in Poland",
-    #         "sourceType": "country",
-    #         "wikiText": "Tychy",
-    #         "references": [
-    #             {
-    #                 "name": "Miasta partnerskie",
-    #                 "url": "https://umtychy.pl/artykul/108/miasta-partnerskie",
-    #                 "publisher": "Tychy",
-    #                 "language": "pl",
-    #                 "accessDate": "2019-09-21",
-    #                 "date": None
-    #             }
-    #         ]
-    #     }
-    # }
     publisher.update(data)
-
