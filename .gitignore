@@ -175,4 +175,10 @@ cython_debug/
 scraper/apicache-py3/*
 test.py
 
+*.ttl
+*.csv
+throttle.ctrl
+*.jsonl
+apicache-py3/
+data/
 
