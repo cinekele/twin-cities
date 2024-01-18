@@ -16,7 +16,7 @@ from layout_helper import run_standalone_app
 
 EMPTY_VALUE = ""
 
-DEBUG = True if os.getenv("PROD_MODE",False) != False else False
+DEBUG = False if os.getenv("PROD_MODE") else True
 
 def header_colors():
     return {
