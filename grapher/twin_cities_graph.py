@@ -93,7 +93,7 @@ class TwinCitiesGraph:
     def get_cities(self) -> list[dict[str, str]]:
         cities = []
         for city_url in self.graph.subjects(RDF.type, self.twin_cities.City):
-            if self.graph.value(city_url, self.twin_cities.twin) is None:  # TODO: something wrong
+            if self.graph.value(city_url, self.twin_cities.twin) is None:
                 continue
             city = {
                 "url": city_url,
@@ -122,12 +122,23 @@ class TwinCitiesGraph:
 
         return twins
 
-    def get_references(self, city_url: str) -> list[dict[str, str]]:
+    def get_references(self, city_url: str, twin_url: str) -> list[dict[str, str]]:
+        city_url = URIRef(city_url)
+        twin_url = URIRef(twin_url)
+
         refs = []
-        for ref_url in self.graph.objects(URIRef(city_url), self.twin_cities.reference):
+        for ref_url in list(self.graph.objects(city_url, self.twin_cities.reference)) + \
+                       list(self.graph.objects(twin_url, self.twin_cities.reference)):
+            if not self._is_reference_relevant(ref_url, city_url, twin_url):
+                continue
+
+            url = self.graph.value(ref_url, self.twin_cities.url)
+            if url.toPython() in [r["url"] for r in refs]:
+                continue
+
             ref = {
                 "name": self.graph.value(ref_url, RDFS.label),
-                "url": self.graph.value(ref_url, self.twin_cities.url),
+                "url": url,
                 "website": self.graph.value(ref_url, self.twin_cities.website),
                 "publisher": self.graph.value(ref_url, self.twin_cities.publisher),
                 "language": self.graph.value(ref_url, self.twin_cities.language),
@@ -141,6 +152,14 @@ class TwinCitiesGraph:
                 ref[key] = value.toPython() if value is not None else None
             refs.append(ref)
         return refs
+
+    def _is_reference_relevant(self, ref_url: Node, city_url: URIRef, twin_url: URIRef) -> bool:
+        city_pairs = list(self.graph.objects(ref_url, self.twin_cities.city_pair))
+        for city_pair in city_pairs:
+            city_pair_cities = list(self.graph.objects(city_pair, self.twin_cities.city))
+            if city_url in city_pair_cities and twin_url in city_pair_cities:
+                return True
+        return False
 
     def serialize(self, format_: str = "turtle") -> str:
         return self.graph.serialize(format=format_)

@@ -105,6 +105,18 @@ def align_twins(data_wikidata: list[dict[str, str]], data_wikipedia: list[dict[s
             })
             i += 1
             j += 1
+    while i < len(data_wikidata):
+        twins.append({
+            "wikidata": data_wikidata[i],
+            "wikipedia": None
+        })
+        i += 1
+    while j < len(data_wikipedia):
+        twins.append({
+            "wikidata": None,
+            "wikipedia": data_wikipedia[j]
+        })
+        j += 1
     return twins
 
 
@@ -296,9 +308,10 @@ def update_refs(active_cell, active_cell_main):
     Output('update-button', 'hidden', allow_duplicate=True),
     Output('update-button', 'disabled', allow_duplicate=True),
     Input('dash-table', 'active_cell'),
+    State('city-url', 'value'),
     prevent_initial_call=True,
 )
-def update_details(active_cell):
+def update_details(active_cell, city_url):
     if active_cell is None:
         return None, None, True, False
 
@@ -318,7 +331,7 @@ def update_details(active_cell):
         })
     global references_wikipedia
     if details['wikipedia'] is not None:
-        references_wikipedia = graph.get_references(details['wikipedia']['url'])
+        references_wikipedia = graph.get_references(city_url, details['wikipedia']['url'])
         for reference in references_wikipedia:
             table.append({
                 "property": "reference",
