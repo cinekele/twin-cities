@@ -20,7 +20,7 @@ app = Dash(__name__)
 def load_graph() -> TwinCitiesGraph:
     st = time.perf_counter()
     g = TwinCitiesGraph()
-    g.load("../twin_cities.ttl")
+    g.load("twin_cities.ttl")
     print(f"Loaded graph in {time.perf_counter() - st:0.2f} seconds")
     return g
 
@@ -58,7 +58,8 @@ def load_twins_wikidata(city_url: str) -> list[dict[str, str | list[dict[str, st
                 data_wikidata[-1]['references'].append({
                     "url": data_wikidata[-1].pop('referenceUrl'),
                     "name": data_wikidata[-1].pop('referenceName') if 'referenceName' in data_wikidata[-1] else None,
-                    "publisher": data_wikidata[-1].pop('referencePublisher') if 'referencePublisher' in data_wikidata[-1] else None,
+                    "publisher": data_wikidata[-1].pop('referencePublisher') if 'referencePublisher' in data_wikidata[
+                        -1] else None,
                 })
     return data_wikidata
 
@@ -121,9 +122,9 @@ def setup():
 
 table_right_config = dict(
     markdown_options={'html': True},
-    columns=[{"name": "property", "id": "property"},
-             {"name": "wikipedia", "id": "wikipedia", "presentation": "markdown", "type": "text"},
-             {"name": "wikidata", "id": "wikidata", "presentation": "markdown", "type": "text"}],
+    columns=[{"name": "Property", "id": "property"},
+             {"name": "Wikipedia", "id": "wikipedia", "presentation": "markdown", "type": "text"},
+             {"name": "Wikidata", "id": "wikidata", "presentation": "markdown", "type": "text"}],
     style_cell={'textAlign': 'left', 'width': '33%'},
     style_data={'whiteSpace': 'normal', 'height': 'auto'},
     style_table={'margin-top': '10px', 'width': '100%'},
@@ -147,10 +148,11 @@ app.layout = html.Div([
     html.Div([
         dcc.Dropdown(id='city-url', options=[], placeholder='Select a city'),
         html.Button('Run Query', id='run-button', style={'margin-top': '10px', 'margin-bottom': '10px'}),
-        daq.BooleanSwitch(id='hide-switch', on=False, style={'margin-top': '10px', 'margin-bottom': '10px'}),
+        daq.BooleanSwitch(label="Show only twin cities from Wikipedia", id='hide-switch', on=False,
+                          labelPosition='top', style={'margin-top': '10px', 'margin-bottom': '10px'}),
         html.Div(id='output-table'),
         dash_table.DataTable(id='dash-table',
-                             columns=[{"name": i, "id": i} for i in ["wikipedia", "wikidata"]],
+                             columns=[{"name": i, "id": i.lower()} for i in ["Wikipedia", "Wikidata"]],
                              fixed_rows={'headers': True},
                              style_cell={'textAlign': 'left', 'width': '50%'},
                              style_data_conditional=[
@@ -190,7 +192,8 @@ app.layout = html.Div([
                              **table_right_config),
         dash_table.DataTable(id='dash-table-refs',
                              **table_right_config),
-        html.Button('Update Wikidata', id='update-button', hidden=True, disabled=False, style={'margin-top': '10px', 'margin-bottom': '10px'})
+        html.Button('Update Wikidata', id='update-button', hidden=True, disabled=False,
+                    style={'margin-top': '10px', 'margin-bottom': '10px'})
     ],
         style={'width': '50%', 'display': 'inline-block', 'margin-left': '5%'}
     )],
@@ -319,6 +322,7 @@ def update_details(active_cell):
         for reference in references_wikipedia:
             table.append({
                 "property": "reference",
+
                 "wikipedia": reference['name'],
                 "wikidata": EMPTY_VALUE
             })
