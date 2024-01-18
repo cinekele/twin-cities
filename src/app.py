@@ -24,7 +24,7 @@ def header_colors():
 def load_graph() -> TwinCitiesGraph:
     st = time.perf_counter()
     g = TwinCitiesGraph()
-    g.load("twin_cities.ttl")
+    g.load("./data/twin_cities.ttl")
     print(f"Loaded graph in {time.perf_counter() - st:0.2f} seconds")
     return g
 

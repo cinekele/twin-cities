@@ -12,5 +12,5 @@ def scrape_to_graph() -> TwinCitiesGraph:
 
 if __name__ == '__main__':
     graph = scrape_to_graph()
-    graph.save("twin_cities.ttl")
+    graph.save("./data/twin_cities.ttl")
     print(graph.serialize())
