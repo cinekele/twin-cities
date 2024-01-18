@@ -17,6 +17,7 @@ from layout_helper import run_standalone_app
 
 EMPTY_VALUE = ""
 
+DEBUG = True if os.getenv("PROD_MODE",False) != False else False
 
 def header_colors():
     return {
@@ -513,4 +514,4 @@ publisher = Publisher()
 
 if __name__ == '__main__':
     setup()
-    app.run_server(debug=True)
+    app.run_server(debug=DEBUG)
