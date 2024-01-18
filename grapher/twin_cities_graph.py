@@ -17,19 +17,24 @@ class TwinCitiesGraph:
         self.wiki = Namespace("https://en.wikipedia.org/wiki/")
         self.graph.bind("wiki", self.wiki)
         self.references = {}
+        self.city_pairs = {}
 
         if cities is not None:
             self.add_cities(cities)
 
     def add_cities(self, cities: list[City]):
         for city in cities:
-            self._add_city(city.wiki_url, city.name, city.country, city.wiki_text, city.source_page, city.source_type,
-                           [])
-            for twin in city.twin_cities:
-                self._add_twin(city.wiki_url, twin, additional_references=city.ref)
+            self._add_city(city.wiki_url, city.name, city.country, city.wiki_text, city.source_page, city.source_type)
 
-    def _add_city(self, url: str, name: str, country: str, wiki_text: str, source_page: str | None,
-                  source_type: str | None, references: list[Reference]):
+            for twin in city.twin_cities:
+                self._add_twin(city.wiki_url, twin)
+
+                for reference in city.ref:
+                    self._add_reference(reference, URIRef(city.wiki_url), URIRef(twin.wiki_url))
+                for reference in twin.refs:
+                    self._add_reference(reference, URIRef(city.wiki_url), URIRef(twin.wiki_url))
+
+    def _add_city(self, url: str, name: str, country: str, wiki_text: str, source_page: str | None, source_type: str | None):
         url = URIRef(url)
         self._add_triple(url, RDF.type, self.twin_cities.City)
         self._add_triple(url, RDFS.label, Literal(name))
@@ -37,17 +42,15 @@ class TwinCitiesGraph:
         self._add_triple(url, self.twin_cities.wikiText, Literal(wiki_text))
         self._add_triple(url, self.twin_cities.sourcePage, Literal(source_page))
         self._add_triple(url, self.twin_cities.sourceType, Literal(source_type))
-        for reference in references:
-            self._add_reference(url, reference)
 
-    def _add_twin(self, city_url: str, twin: TwinCitiesAgreement, additional_references: list[Reference]):
+    def _add_twin(self, city_url: str, twin: TwinCitiesAgreement):
         city_url = URIRef(city_url)
-        self._add_city(twin.wiki_url, twin.second_city, twin.second_country, twin.wiki_text, None, None,
-                       twin.refs + additional_references)
+        self._add_city(twin.wiki_url, twin.second_city, twin.second_country, twin.wiki_text, None, None)
         twin_url = URIRef(twin.wiki_url)
         self._add_triple(city_url, self.twin_cities.twin, twin_url)
+        self._add_triple(twin_url, self.twin_cities.twin, city_url)
 
-    def _add_reference(self, city_url: URIRef, reference: Reference):
+    def _add_reference(self, reference: Reference, city_url: URIRef, twin_url: URIRef):
         url = coalesce(reference.url, reference.website, reference.title, reference.publisher, "unknown")
 
         if url in self.references:
@@ -64,8 +67,22 @@ class TwinCitiesGraph:
         self._add_triple(ref, self.twin_cities.accessDate, Literal(reference.access_date))
         self._add_triple(ref, self.twin_cities.date, Literal(reference.date))
 
+        if (city_url, twin_url) in self.city_pairs:
+            city_pair = self.city_pairs[(city_url, twin_url)]
+        elif (twin_url, city_url) in self.city_pairs:
+            city_pair = self.city_pairs[(twin_url, city_url)]
+        else:
+            city_pair = BNode()
+            self._add_triple(city_pair, RDF.type, self.twin_cities.CityPair)
+            self._add_triple(city_pair, self.twin_cities.city, city_url)
+            self._add_triple(city_pair, self.twin_cities.city, twin_url)
+        self._add_triple(ref, self.twin_cities.city_pair, city_pair)
+
         self._add_triple(city_url, self.twin_cities.reference, ref)
+        self._add_triple(twin_url, self.twin_cities.reference, ref)
+
         self.references[url] = ref
+        self.city_pairs[(city_url, twin_url)] = city_pair
 
     def _add_triple(self, subject: Node | None, predicate: Node, object_: Node | None):
         if subject is None or object_ is None or object_ == Literal("None"):
