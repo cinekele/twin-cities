@@ -12,12 +12,13 @@ from grapher.twin_cities_graph import TwinCitiesGraph
 from wikidata import queries as q
 from wikidata.publish import Publisher
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.append(parent_dir)
+from layout_helper import run_standalone_app
 
-app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
-publisher = Publisher()
+def header_colors():
+    return {
+        'bg_color': '#0C4142',
+        'font_color': 'white',
+    }
 
 
 def load_graph() -> TwinCitiesGraph:
@@ -140,9 +141,9 @@ table_right_config = dict(
     columns=[{"name": "Property", "id": "property"},
              {"name": "Wikipedia", "id": "wikipedia", "presentation": "markdown", "type": "text"},
              {"name": "Wikidata", "id": "wikidata", "presentation": "markdown", "type": "text"}],
-    style_cell={'textAlign': 'left', 'width': '33%'},
-    style_data={'whiteSpace': 'normal', 'height': 'auto'},
-    style_table={'margin-top': '10px', 'width': '100%'},
+    style_cell={'textAlign': 'left'}, # , 'width': '33%'
+    style_data={'whiteSpace': 'normal'}, #, 'height': 'auto'
+    style_table={'margin-top': '10px'}, # , 'width': '100%'
     style_data_conditional=[
         {
             'if': {
@@ -158,281 +159,334 @@ table_right_config = dict(
          {'selector': 'div.dash-cell-value.cell-markdown', 'rule': 'font-family: monospace'}]
 )
 EMPTY_VALUE = ""
+def layout():
+    return html.Div(id='app-body', className='app-body', children=[
+            dcc.Store(id='memory'),
+            html.Div([
+                
+            html.Div(className='control-tab two columns', children=[
+                html.H4(
+                    className='what-is',
+                    children='What is Alignment Viewer?'
+                ),
+                html.P(
+                    """
+                    This application is going to help to complete
+                    information in Wikidata about Twin Cities.
+                    """
+                ),
+                html.P(
+                    """
+                    It will allow you to compare information from
+                    Wikipedia and Wikidata and update Wikidata.
+                    
+                    First Select Tab XYZ to see the list of twin cities.
+                    Then ...
+                    """
+                ),
+                html.P(
+                    """
+                    Read more about the component here:
+                    ...
+                    """
+                ),
+            ]),
+            html.Div(id='ten columns', className='', children=[
+                dcc.Tabs(
+                    id='multiple-tabs', value='what-is',
+                    children=[
+                        dcc.Tab(
+                            label='Twin city comparision',
+                            value='twin-list',
+                            children=html.Div(className='single-tab', children=[
+                                html.Div(className="search-div", children=[
+                                    html.Div(className="dropdown-div nine columns", children=[
+                                        dcc.Dropdown(id='city-url', className='', options=[], placeholder='Select a city'),
+                                    ]),
+                                    html.Button('Run Query', id='run-button', className='three columns'),
+                                ]),
+                                daq.BooleanSwitch(label="Show only twin cities from Wikipedia", id='hide-switch', on=False,
+                                                labelPosition='top', style={'margin-top': '10px', 'margin-bottom': '10px'}),
+                                html.Div(id='output-table', className='table twin-cities-table', children=[
+                                    dash_table.DataTable(id='dash-table',
+                                                        columns=[{"name": i, "id": i.lower()} for i in ["Wikipedia", "Wikidata"]],
+                                                        fixed_rows={'headers': True},
+                                                        style_cell={'textAlign': 'left'}, # , 'width': '50%'
+                                                        style_data_conditional=[
+                                                            {
+                                                                'if': {
+                                                                    'filter_query': '{wikipedia} is nil',
+                                                                    'column_id': 'wikipedia',
+                                                                },
+                                                                'backgroundColor': 'rgb(255, 175, 175, 0.5)',
+                                                            },
+                                                            {
+                                                                'if': {
+                                                                    'filter_query': '{wikidata} is nil',
+                                                                    'column_id': 'wikidata',
+                                                                },
+                                                                'backgroundColor': 'rgb(175, 255, 175, 0.5)',
+                                                            },
+                                                            {
+                                                                'if': {
+                                                                    'filter_query': '!({wikipedia} is nil) && {wikidata} is nil',
+                                                                    'column_id': 'wikipedia',
+                                                                },
+                                                                'backgroundColor': 'rgba(255, 175, 175, 0.5)',
+                                                            },
+                                                            {
+                                                                'if': {
+                                                                    'state': 'selected',
+                                                                },
+                                                                'backgroundColor': 'rgba(75, 75, 255, 0.2)',
+                                                                'border': '1px solid rgb(75, 75, 255)',
+                                                            }
+                                                        ]),
+                                ], style={'margin-top': '10px', 'margin-bottom': '10px', 'max-height': '500px', 'overflow': 'auto'}),
+                                # style={'height': '100%', 'width': '40%', 'display': 'inline-block', 'vertical-align': 'top'}
+                            ])
+                        )
+                        ]
+                    )
+                ]),
+            
+        ]),
+        html.Div([
+            dash_table.DataTable(id='dash-table-details',
+                                **table_right_config),
+            dash_table.DataTable(id='dash-table-refs',
+                                **table_right_config),
+            html.Button('Update Wikidata', id='update-button', hidden=True, disabled=False,
+                        style={'margin-top': '10px', 'margin-bottom': '10px'}),
+            dbc.Alert("ERROR !!! Something went wrong.", id='error_alert', is_open=False, fade=True, dismissable=True,
+                    style={'margin-top': '10px', 'margin-bottom': '10px'}, color='danger'),
+            dbc.Alert("Update performed successfully !!!", id='success_alert', is_open=False, fade=True, dismissable=True,
+                    style={'margin-top': '10px', 'margin-bottom': '10px'}, color='success')
+        ],
+            style={'width': '50%', 'display': 'inline-block', 'margin-left': '5%'}
+        )
+        ],
+        #style={'height': '100%', 'width': '100%'}
+    )
 
-app.layout = html.Div([
-    dcc.Store(id='memory'),
-    html.Div([
-        dcc.Dropdown(id='city-url', options=[], placeholder='Select a city'),
-        html.Button('Run Query', id='run-button', style={'margin-top': '10px', 'margin-bottom': '10px'}),
-        daq.BooleanSwitch(label="Show only twin cities from Wikipedia", id='hide-switch', on=False,
-                          labelPosition='top', style={'margin-top': '10px', 'margin-bottom': '10px'}),
-        html.Div(id='output-table'),
-        dash_table.DataTable(id='dash-table',
-                             columns=[{"name": i, "id": i.lower()} for i in ["Wikipedia", "Wikidata"]],
-                             fixed_rows={'headers': True},
-                             style_cell={'textAlign': 'left', 'width': '50%'},
-                             style_data_conditional=[
-                                 {
-                                     'if': {
-                                         'filter_query': '{wikipedia} is nil',
-                                         'column_id': 'wikipedia',
-                                     },
-                                     'backgroundColor': 'rgb(255, 175, 175, 0.5)',
-                                 },
-                                 {
-                                     'if': {
-                                         'filter_query': '{wikidata} is nil',
-                                         'column_id': 'wikidata',
-                                     },
-                                     'backgroundColor': 'rgb(175, 255, 175, 0.5)',
-                                 },
-                                 {
-                                     'if': {
-                                         'filter_query': '!({wikipedia} is nil) && {wikidata} is nil',
-                                         'column_id': 'wikipedia',
-                                     },
-                                     'backgroundColor': 'rgba(255, 175, 175, 0.5)',
-                                 },
-                                 {
-                                     'if': {
-                                         'state': 'selected',
-                                     },
-                                     'backgroundColor': 'rgba(75, 75, 255, 0.2)',
-                                     'border': '1px solid rgb(75, 75, 255)',
-                                 }
-                             ]),
-    ],
-        style={'height': '100%', 'width': '40%', 'display': 'inline-block', 'vertical-align': 'top'}),
-    html.Div([
-        dash_table.DataTable(id='dash-table-details',
-                             **table_right_config),
-        dash_table.DataTable(id='dash-table-refs',
-                             **table_right_config),
-        html.Button('Update Wikidata', id='update-button', hidden=True, disabled=False,
-                    style={'margin-top': '10px', 'margin-bottom': '10px'}),
-        dbc.Alert("ERROR !!! Something went wrong.", id='error_alert', is_open=False, fade=True, dismissable=True,
-                  style={'margin-top': '10px', 'margin-bottom': '10px'}, color='danger'),
-        dbc.Alert("Update performed successfully !!!", id='success_alert', is_open=False, fade=True, dismissable=True,
-                  style={'margin-top': '10px', 'margin-bottom': '10px'}, color='success')
-    ],
-        style={'width': '50%', 'display': 'inline-block', 'margin-left': '5%'}
-    )],
-    style={'height': '100%', 'width': '100%'}
-)
 
+def callbacks(_app: Dash):
 
-@app.callback(
-    Output('update-button', 'disabled', allow_duplicate=True),
-    Output('memory', 'data'),
-    Input('update-button', 'n_clicks'),
-    State('city-url', 'value'),
-    State('dash-table', 'active_cell'),
-    prevent_initial_call=True,
-)
-def query(n_clicks, city_url, active_cell):
-    if n_clicks is None or city_url is None or active_cell is None:
-        return False
+    @_app.callback(
+        Output('update-button', 'disabled', allow_duplicate=True),
+        Output('memory', 'data'),
+        Input('update-button', 'n_clicks'),
+        State('city-url', 'value'),
+        State('dash-table', 'active_cell'),
+        prevent_initial_call=True,
+    )
+    def query(n_clicks, city_url, active_cell):
+        if n_clicks is None or city_url is None or active_cell is None:
+            return False
 
-    source_id = None
-    for details in twins_details:
-        if details['wikidata'] is not None:
-            source_id = details['wikidata']['sourceId']
-            break
+        source_id = None
+        for details in twins_details:
+            if details['wikidata'] is not None:
+                source_id = details['wikidata']['sourceId']
+                break
 
-    row = active_cell['row']
-    details = twins_details[row]
+        row = active_cell['row']
+        details = twins_details[row]
 
-    update_object = {
-        "sourceUrl": city_url,
-        "sourceId": source_id,
-        "twin": {
-            **details['wikipedia'],
-            "references": references_wikipedia
+        update_object = {
+            "sourceUrl": city_url,
+            "sourceId": source_id,
+            "twin": {
+                **details['wikipedia'],
+                "references": references_wikipedia
+            }
         }
-    }
-    try:
-        res = publisher.update(update_object)
-        return True, res
-    except Exception as e:
-        message = str(e)
-        return True, message
+        try:
+            res = publisher.update(update_object)
+            return True, res
+        except Exception as e:
+            message = str(e)
+            return True, message
+
+    @_app.callback(
+        [Output('error_alert', 'is_open'), Output('error_alert', 'children')],
+        Input('memory', 'data'),
+        prevent_initial_call=True,
+    )
+    def show_error_alert(data):
+        if isinstance(data, str):
+            return True, data
+        return False, ""
 
 
-@app.callback(
-    [Output('error_alert', 'is_open'), Output('error_alert', 'children')],
-    Input('memory', 'data'),
-    prevent_initial_call=True,
-)
-def show_error_alert(data):
-    if isinstance(data, str):
-        return True, data
-    return False, ""
+    @_app.callback(
+        Output('success_alert', 'is_open'),
+        Output('success_alert', 'children'),
+        Input('memory', 'data'),
+        prevent_initial_call=True
+    )
+    def show_success_alert(data):
+        if isinstance(data, bool) and data:
+            return True, "Updated successfully"
+        return False, ""
 
 
-@app.callback(
-    Output('success_alert', 'is_open'),
-    Output('success_alert', 'children'),
-    Input('memory', 'data'),
-    prevent_initial_call=True
-)
-def show_success_alert(data):
-    if isinstance(data, bool) and data:
-        return True, "Updated successfully"
-    return False, ""
+    @_app.callback(
+        Output("city-url", "options"),
+        Input("city-url", "search_value")
+    )
+    def update_options(search_value):
+        if not search_value or len(search_value) < 3:
+            # return [] # either clear previous search results or keep old ones
+            raise PreventUpdate
+        options = city_urls
+        st = time.perf_counter()
+        out = [o for o in options if search_value.lower() in o["label"].lower()][:100]
+        print(f"Filtered options in {time.perf_counter() - st:0.2f} seconds")
+        return out
 
 
-@app.callback(
-    Output("city-url", "options"),
-    Input("city-url", "search_value")
-)
-def update_options(search_value):
-    if not search_value or len(search_value) < 3:
-        # return [] # either clear previous search results or keep old ones
-        raise PreventUpdate
-    options = city_urls
-    st = time.perf_counter()
-    out = [o for o in options if search_value.lower() in o["label"].lower()][:100]
-    print(f"Filtered options in {time.perf_counter() - st:0.2f} seconds")
-    return out
+    @_app.callback(
+        Output('dash-table-refs', 'data', allow_duplicate=True),
+        Input('dash-table-details', 'active_cell'),
+        State('dash-table', 'active_cell'),
+        prevent_initial_call=True,
+    )
+    def update_refs(active_cell, active_cell_main):
+        if active_cell is None or active_cell_main is None:
+            return None
 
-
-@app.callback(
-    Output('dash-table-refs', 'data', allow_duplicate=True),
-    Input('dash-table-details', 'active_cell'),
-    State('dash-table', 'active_cell'),
-    prevent_initial_call=True,
-)
-def update_refs(active_cell, active_cell_main):
-    if active_cell is None or active_cell_main is None:
+        row_main = active_cell_main['row']
+        row = active_cell['row']
+        details = twins_details[row_main]
+        if row >= len(details_names):
+            if row - len(details_names) < len(references_wikipedia):
+                reference = references_wikipedia[row - len(details_names)]
+                table = []
+                for key, value in reference.items():
+                    if value is None:
+                        continue
+                    table.append({
+                        "property": key,
+                        "wikipedia": value if key != "url" else f"<a href='{value}' target='_blank' >{value}</a>",
+                        "wikidata": EMPTY_VALUE
+                    })
+                return table
+            else:
+                reference = details['wikidata']['references'][row - len(details_names) - len(references_wikipedia)]
+                table = []
+                for key, value in reference.items():
+                    if value is None:
+                        continue
+                    table.append({
+                        "property": key,
+                        "wikipedia": EMPTY_VALUE,
+                        "wikidata": value if key != "url" else f"<a href='{value}' target='_blank' >{value}</a>"
+                    })
+                return table
         return None
 
-    row_main = active_cell_main['row']
-    row = active_cell['row']
-    details = twins_details[row_main]
-    if row >= len(details_names):
-        if row - len(details_names) < len(references_wikipedia):
-            reference = references_wikipedia[row - len(details_names)]
-            table = []
-            for key, value in reference.items():
-                if value is None:
-                    continue
+
+    @_app.callback(
+        Output('dash-table-details', 'data', allow_duplicate=True),
+        Output('dash-table-refs', 'data', allow_duplicate=True),
+        Output('update-button', 'hidden', allow_duplicate=True),
+        Output('update-button', 'disabled', allow_duplicate=True),
+        Input('dash-table', 'active_cell'),
+        State('city-url', 'value'),
+        prevent_initial_call=True,
+    )
+    def update_details(active_cell, city_url):
+        if active_cell is None:
+            return None, None, True, False
+
+        row = active_cell['row']
+        details = twins_details[row]
+        table = []
+        for details_name in details_names:
+            field_wikipedia = details['wikipedia'][details_name] if details['wikipedia'] is not None else None
+            field_wikidata = details['wikidata'][details_name] if details['wikidata'] is not None else None
+            if details_name == "url":
+                field_wikipedia = f"<a href='{field_wikipedia}' target='_blank' >{field_wikipedia}</a>" if field_wikipedia is not None else EMPTY_VALUE
+                field_wikidata = f"<a href='{field_wikidata}' target='_blank' >{field_wikidata}</a>" if field_wikidata is not None else EMPTY_VALUE
+            table.append({
+                "property": details_name,
+                "wikipedia": field_wikipedia if field_wikipedia is not None else EMPTY_VALUE,
+                "wikidata": field_wikidata if field_wikidata is not None else EMPTY_VALUE
+            })
+        global references_wikipedia
+        if details['wikipedia'] is not None:
+            references_wikipedia = graph.get_references(city_url, details['wikipedia']['url'])
+            for reference in references_wikipedia:
                 table.append({
-                    "property": key,
-                    "wikipedia": value if key != "url" else f"<a href='{value}' target='_blank' >{value}</a>",
+                    "property": "reference",
+
+                    "wikipedia": reference['name'],
                     "wikidata": EMPTY_VALUE
                 })
-            return table
         else:
-            reference = details['wikidata']['references'][row - len(details_names) - len(references_wikipedia)]
-            table = []
-            for key, value in reference.items():
-                if value is None:
-                    continue
+            references_wikipedia = []
+        if details['wikidata'] is not None:
+            for reference in details['wikidata']['references']:
                 table.append({
-                    "property": key,
+                    "property": "reference",
                     "wikipedia": EMPTY_VALUE,
-                    "wikidata": value if key != "url" else f"<a href='{value}' target='_blank' >{value}</a>"
+                    "wikidata": reference['name'] if reference['name'] is not None else reference['url']
                 })
-            return table
-    return None
+
+        button_hidden = True
+        if twins_names[row]['wikipedia'] is not None and twins_names[row]['wikidata'] is None:
+            button_hidden = False
+        return table, None, button_hidden, False
 
 
-@app.callback(
-    Output('dash-table-details', 'data', allow_duplicate=True),
-    Output('dash-table-refs', 'data', allow_duplicate=True),
-    Output('update-button', 'hidden', allow_duplicate=True),
-    Output('update-button', 'disabled', allow_duplicate=True),
-    Input('dash-table', 'active_cell'),
-    State('city-url', 'value'),
-    prevent_initial_call=True,
-)
-def update_details(active_cell, city_url):
-    if active_cell is None:
-        return None, None, True, False
-
-    row = active_cell['row']
-    details = twins_details[row]
-    table = []
-    for details_name in details_names:
-        field_wikipedia = details['wikipedia'][details_name] if details['wikipedia'] is not None else None
-        field_wikidata = details['wikidata'][details_name] if details['wikidata'] is not None else None
-        if details_name == "url":
-            field_wikipedia = f"<a href='{field_wikipedia}' target='_blank' >{field_wikipedia}</a>" if field_wikipedia is not None else EMPTY_VALUE
-            field_wikidata = f"<a href='{field_wikidata}' target='_blank' >{field_wikidata}</a>" if field_wikidata is not None else EMPTY_VALUE
-        table.append({
-            "property": details_name,
-            "wikipedia": field_wikipedia if field_wikipedia is not None else EMPTY_VALUE,
-            "wikidata": field_wikidata if field_wikidata is not None else EMPTY_VALUE
-        })
-    global references_wikipedia
-    if details['wikipedia'] is not None:
-        references_wikipedia = graph.get_references(city_url, details['wikipedia']['url'])
-        for reference in references_wikipedia:
-            table.append({
-                "property": "reference",
-
-                "wikipedia": reference['name'],
-                "wikidata": EMPTY_VALUE
-            })
-    else:
-        references_wikipedia = []
-    if details['wikidata'] is not None:
-        for reference in details['wikidata']['references']:
-            table.append({
-                "property": "reference",
-                "wikipedia": EMPTY_VALUE,
-                "wikidata": reference['name'] if reference['name'] is not None else reference['url']
-            })
-
-    button_hidden = True
-    if twins_names[row]['wikipedia'] is not None and twins_names[row]['wikidata'] is None:
-        button_hidden = False
-    return table, None, button_hidden, False
+    @_app.callback(
+        Output('dash-table', 'data', allow_duplicate=True),
+        Input('hide-switch', 'on'),
+        prevent_initial_call=True,
+    )
+    def update_table_hide(on):
+        global twins_names
+        twins_names = []
+        for result in twins_details:
+            if on and result['wikidata'] is not None:
+                continue
+            twins_names.append({"wikipedia": result['wikipedia']['name'] if result['wikipedia'] is not None else None,
+                                "wikidata": result['wikidata']['name'] if result['wikidata'] is not None else None})
+        return twins_names
 
 
-@app.callback(
-    Output('dash-table', 'data', allow_duplicate=True),
-    Input('hide-switch', 'on'),
-    prevent_initial_call=True,
-)
-def update_table_hide(on):
-    global twins_names
-    twins_names = []
-    for result in twins_details:
-        if on and result['wikidata'] is not None:
-            continue
-        twins_names.append({"wikipedia": result['wikipedia']['name'] if result['wikipedia'] is not None else None,
-                            "wikidata": result['wikidata']['name'] if result['wikidata'] is not None else None})
-    return twins_names
+    @_app.callback(
+        Output('dash-table', 'data'),
+        Output('dash-table-details', 'data'),
+        Output('dash-table-refs', 'data'),
+        Output('hide-switch', 'on'),
+        Output('update-button', 'hidden'),
+        Output('update-button', 'disabled'),
+        Input('run-button', 'n_clicks'),
+        State('city-url', 'value'),
+        prevent_initial_call=True,
+    )
+    def update_table(n_clicks, city_url):
+        if n_clicks is None:
+            return None, None, None, False, True, False  # Not clicked yet
+
+        data_wikidata = load_twins_wikidata(city_url)
+        data_wikipedia = load_twins_wikipedia(city_url)
+
+        global twins_details, twins_names
+        twins_details = align_twins(data_wikidata, data_wikipedia)
+        twins_names = []
+
+        for result in twins_details:
+            twins_names.append({"wikipedia": result['wikipedia']['name'] if result['wikipedia'] is not None else None,
+                                "wikidata": result['wikidata']['name'] if result['wikidata'] is not None else None})
+        return twins_names, None, None, False, True, False
 
 
-@app.callback(
-    Output('dash-table', 'data'),
-    Output('dash-table-details', 'data'),
-    Output('dash-table-refs', 'data'),
-    Output('hide-switch', 'on'),
-    Output('update-button', 'hidden'),
-    Output('update-button', 'disabled'),
-    Input('run-button', 'n_clicks'),
-    State('city-url', 'value'),
-    prevent_initial_call=True,
-)
-def update_table(n_clicks, city_url):
-    if n_clicks is None:
-        return None, None, None, False, True, False  # Not clicked yet
-
-    data_wikidata = load_twins_wikidata(city_url)
-    data_wikipedia = load_twins_wikipedia(city_url)
-
-    global twins_details, twins_names
-    twins_details = align_twins(data_wikidata, data_wikipedia)
-    twins_names = []
-
-    for result in twins_details:
-        twins_names.append({"wikipedia": result['wikipedia']['name'] if result['wikipedia'] is not None else None,
-                            "wikidata": result['wikidata']['name'] if result['wikidata'] is not None else None})
-    return twins_names, None, None, False, True, False
-
+app = run_standalone_app(layout, callbacks, header_colors, __file__)
+server = app.server
+publisher = Publisher()
 
 if __name__ == '__main__':
     setup()
