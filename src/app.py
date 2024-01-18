@@ -14,6 +14,10 @@ from wikidata.publish import Publisher
 
 from layout_helper import run_standalone_app
 
+
+EMPTY_VALUE = ""
+
+
 def header_colors():
     return {
         'bg_color': '#0C4142',
@@ -75,58 +79,67 @@ def load_twins_wikipedia(city_url: str) -> list[dict[str, str]]:
     return data_wikipedia
 
 
-def align_twins(data_wikidata: list[dict[str, str]], data_wikipedia: list[dict[str, str]]) -> list[
-    dict[str, dict[str, str]]]:
-    twins = []
+def align(data_1: list[dict[str, str]], data_2: list[dict[str, str]]) -> list[dict[str, dict[str, str]]]:
+    data = []
     i = 0
     j = 0
-    while i < len(data_wikidata) and j < len(data_wikipedia):
-        if data_wikidata[i]['url'] != data_wikipedia[j]['url']:
-            if data_wikidata[i]['name'] == data_wikipedia[j]['name']:
-                twins.append({
-                    "wikidata": data_wikidata[i],
-                    "wikipedia": data_wikipedia[j]
+    while i < len(data_1) and j < len(data_2):
+        if data_1[i]['url'] != data_2[j]['url']:
+            if data_1[i]['name'] == data_2[j]['name']:
+                data.append({
+                    "wikidata": data_1[i],
+                    "wikipedia": data_2[j]
                 })
                 i += 1
                 j += 1
             else:
-                if data_wikidata[i]['url'] < data_wikipedia[j]['url']:
-                    twins.append({
-                        "wikidata": data_wikidata[i],
-                        "wikipedia": None
+                if data_1[i]['url'] < data_2[j]['url']:
+                    data.append({
+                        "wikidata": data_1[i]
                     })
                     i += 1
-                elif data_wikidata[i]['url'] > data_wikipedia[j]['url']:
-                    twins.append({
-                        "wikidata": None,
-                        "wikipedia": data_wikipedia[j]
+                elif data_1[i]['url'] > data_2[j]['url']:
+                    data.append({
+                        "wikipedia": data_2[j]
                     })
                     j += 1
         else:
-            twins.append({
-                "wikidata": data_wikidata[i],
-                "wikipedia": data_wikipedia[j]
+            data.append({
+                "wikidata": data_1[i],
+                "wikipedia": data_2[j]
             })
             i += 1
             j += 1
-    while i < len(data_wikidata):
-        twins.append({
-            "wikidata": data_wikidata[i],
-            "wikipedia": None
+    while i < len(data_1):
+        data.append({
+            "wikidata": data_1[i],
         })
         i += 1
-    while j < len(data_wikipedia):
-        twins.append({
-            "wikidata": None,
-            "wikipedia": data_wikipedia[j]
+    while j < len(data_2):
+        data.append({
+            "wikipedia": data_2[j]
         })
         j += 1
-    return twins
+    return data
+
+
+def mask_url(url: str | None, prop: str) -> str | None:
+    if prop != "url":
+        return url
+    if url is None:
+        return None
+    return f"<a href='{url}' target='_blank' >{url}</a>"
+
+
+def mask_none(value: str | None) -> str:
+    if value is None:
+        return EMPTY_VALUE
+    return value
 
 
 twins_details: list[dict[str, dict[str, str]]] = []
-twins_names: list[dict[str, str]] = []
-references_wikipedia: list[dict[str, str]] = []
+twins_names: list[dict[str, str | int]] = []
+references: list[dict[str, dict[str, str]]] = []
 details_names = ["name", "url"]
 
 
@@ -141,9 +154,9 @@ table_right_config = dict(
     columns=[{"name": "Property", "id": "property"},
              {"name": "Wikipedia", "id": "wikipedia", "presentation": "markdown", "type": "text"},
              {"name": "Wikidata", "id": "wikidata", "presentation": "markdown", "type": "text"}],
-    style_cell={'textAlign': 'left'}, # , 'width': '33%'
-    style_data={'whiteSpace': 'normal'}, #, 'height': 'auto'
-    style_table={'margin-top': '10px'}, # , 'width': '100%'
+    style_cell={'textAlign': 'left'},  # , 'width': '33%'
+    style_data={'whiteSpace': 'normal'},  # , 'height': 'auto'
+    style_table={'margin-top': '10px'},  # , 'width': '100%'
     style_data_conditional=[
         {
             'if': {
@@ -158,12 +171,13 @@ table_right_config = dict(
          {'selector': 'p', 'rule': 'margin: 0'},
          {'selector': 'div.dash-cell-value.cell-markdown', 'rule': 'font-family: monospace'}]
 )
-EMPTY_VALUE = ""
+
+
 def layout():
     return html.Div(id='app-body', className='app-body', children=[
-            dcc.Store(id='memory'),
-            html.Div([
-                
+        dcc.Store(id='memory'),
+        html.Div([
+
             html.Div(className='control-tab two columns', children=[
                 html.H4(
                     className='what-is',
@@ -201,77 +215,82 @@ def layout():
                             children=html.Div(className='single-tab', children=[
                                 html.Div(className="search-div", children=[
                                     html.Div(className="dropdown-div nine columns", children=[
-                                        dcc.Dropdown(id='city-url', className='', options=[], placeholder='Select a city'),
+                                        dcc.Dropdown(id='city-url', className='', options=[],
+                                                     placeholder='Select a city'),
                                     ]),
                                     html.Button('Run Query', id='run-button', className='three columns'),
                                 ]),
-                                daq.BooleanSwitch(label="Show only twin cities from Wikipedia", id='hide-switch', on=False,
-                                                labelPosition='top', style={'margin-top': '10px', 'margin-bottom': '10px'}),
+                                daq.BooleanSwitch(label="Show only twin cities from Wikipedia", id='hide-switch',
+                                                  on=False,
+                                                  labelPosition='top',
+                                                  style={'margin-top': '10px', 'margin-bottom': '10px'}),
                                 html.Div(id='output-table', className='table twin-cities-table', children=[
                                     dash_table.DataTable(id='dash-table',
-                                                        columns=[{"name": i, "id": i.lower()} for i in ["Wikipedia", "Wikidata"]],
-                                                        fixed_rows={'headers': True},
-                                                        style_cell={'textAlign': 'left'}, # , 'width': '50%'
-                                                        style_data_conditional=[
-                                                            {
-                                                                'if': {
-                                                                    'filter_query': '{wikipedia} is nil',
-                                                                    'column_id': 'wikipedia',
-                                                                },
-                                                                'backgroundColor': 'rgb(255, 175, 175, 0.5)',
-                                                            },
-                                                            {
-                                                                'if': {
-                                                                    'filter_query': '{wikidata} is nil',
-                                                                    'column_id': 'wikidata',
-                                                                },
-                                                                'backgroundColor': 'rgb(175, 255, 175, 0.5)',
-                                                            },
-                                                            {
-                                                                'if': {
-                                                                    'filter_query': '!({wikipedia} is nil) && {wikidata} is nil',
-                                                                    'column_id': 'wikipedia',
-                                                                },
-                                                                'backgroundColor': 'rgba(255, 175, 175, 0.5)',
-                                                            },
-                                                            {
-                                                                'if': {
-                                                                    'state': 'selected',
-                                                                },
-                                                                'backgroundColor': 'rgba(75, 75, 255, 0.2)',
-                                                                'border': '1px solid rgb(75, 75, 255)',
-                                                            }
-                                                        ]),
-                                ], style={'margin-top': '10px', 'margin-bottom': '10px', 'max-height': '500px', 'overflow': 'auto'}),
+                                                         columns=[{"name": i, "id": i.lower()} for i in
+                                                                  ["Wikipedia", "Wikidata"]],
+                                                         fixed_rows={'headers': True},
+                                                         style_cell={'textAlign': 'left'},  # , 'width': '50%'
+                                                         style_data_conditional=[
+                                                             {
+                                                                 'if': {
+                                                                     'filter_query': '{wikipedia} is nil',
+                                                                     'column_id': 'wikipedia',
+                                                                 },
+                                                                 'backgroundColor': 'rgb(255, 175, 175, 0.5)',
+                                                             },
+                                                             {
+                                                                 'if': {
+                                                                     'filter_query': '{wikidata} is nil',
+                                                                     'column_id': 'wikidata',
+                                                                 },
+                                                                 'backgroundColor': 'rgb(175, 255, 175, 0.5)',
+                                                             },
+                                                             {
+                                                                 'if': {
+                                                                     'filter_query': '!({wikipedia} is nil) && {wikidata} is nil',
+                                                                     'column_id': 'wikipedia',
+                                                                 },
+                                                                 'backgroundColor': 'rgba(255, 175, 175, 0.5)',
+                                                             },
+                                                             {
+                                                                 'if': {
+                                                                     'state': 'selected',
+                                                                 },
+                                                                 'backgroundColor': 'rgba(75, 75, 255, 0.2)',
+                                                                 'border': '1px solid rgb(75, 75, 255)',
+                                                             }
+                                                         ]),
+                                ], style={'margin-top': '10px', 'margin-bottom': '10px', 'max-height': '500px',
+                                          'overflow': 'auto'}),
                                 # style={'height': '100%', 'width': '40%', 'display': 'inline-block', 'vertical-align': 'top'}
                             ])
                         )
-                        ]
-                    )
-                ]),
-            
+                    ]
+                )
+            ]),
+
         ]),
         html.Div([
             dash_table.DataTable(id='dash-table-details',
-                                **table_right_config),
+                                 **table_right_config),
             dash_table.DataTable(id='dash-table-refs',
-                                **table_right_config),
+                                 **table_right_config),
             html.Button('Update Wikidata', id='update-button', hidden=True, disabled=False,
                         style={'margin-top': '10px', 'margin-bottom': '10px'}),
             dbc.Alert("ERROR !!! Something went wrong.", id='error_alert', is_open=False, fade=True, dismissable=True,
-                    style={'margin-top': '10px', 'margin-bottom': '10px'}, color='danger'),
-            dbc.Alert("Update performed successfully !!!", id='success_alert', is_open=False, fade=True, dismissable=True,
-                    style={'margin-top': '10px', 'margin-bottom': '10px'}, color='success')
+                      style={'margin-top': '10px', 'margin-bottom': '10px'}, color='danger'),
+            dbc.Alert("Update performed successfully !!!", id='success_alert', is_open=False, fade=True,
+                      dismissable=True,
+                      style={'margin-top': '10px', 'margin-bottom': '10px'}, color='success')
         ],
             style={'width': '50%', 'display': 'inline-block', 'margin-left': '5%'}
         )
-        ],
-        #style={'height': '100%', 'width': '100%'}
-    )
+    ],
+                    # style={'height': '100%', 'width': '100%'}
+                    )
 
 
 def callbacks(_app: Dash):
-
     @_app.callback(
         Output('update-button', 'disabled', allow_duplicate=True),
         Output('memory', 'data'),
@@ -286,7 +305,7 @@ def callbacks(_app: Dash):
 
         source_id = None
         for details in twins_details:
-            if details['wikidata'] is not None:
+            if 'wikidata' in details:
                 source_id = details['wikidata']['sourceId']
                 break
 
@@ -297,8 +316,8 @@ def callbacks(_app: Dash):
             "sourceUrl": city_url,
             "sourceId": source_id,
             "twin": {
-                **details['wikipedia'],
-                "references": references_wikipedia
+                **details.get('wikipedia', {}),
+                "references": [ref['wikipedia'] for ref in references if 'wikipedia' in ref]
             }
         }
         try:
@@ -318,7 +337,6 @@ def callbacks(_app: Dash):
             return True, data
         return False, ""
 
-
     @_app.callback(
         Output('success_alert', 'is_open'),
         Output('success_alert', 'children'),
@@ -329,7 +347,6 @@ def callbacks(_app: Dash):
         if isinstance(data, bool) and data:
             return True, "Updated successfully"
         return False, ""
-
 
     @_app.callback(
         Output("city-url", "options"),
@@ -345,47 +362,27 @@ def callbacks(_app: Dash):
         print(f"Filtered options in {time.perf_counter() - st:0.2f} seconds")
         return out
 
-
     @_app.callback(
         Output('dash-table-refs', 'data', allow_duplicate=True),
         Input('dash-table-details', 'active_cell'),
-        State('dash-table', 'active_cell'),
         prevent_initial_call=True,
     )
-    def update_refs(active_cell, active_cell_main):
-        if active_cell is None or active_cell_main is None:
+    def update_refs(active_cell):
+        if active_cell is None:
             return None
 
-        row_main = active_cell_main['row']
         row = active_cell['row']
-        details = twins_details[row_main]
         if row >= len(details_names):
-            if row - len(details_names) < len(references_wikipedia):
-                reference = references_wikipedia[row - len(details_names)]
-                table = []
-                for key, value in reference.items():
-                    if value is None:
-                        continue
-                    table.append({
-                        "property": key,
-                        "wikipedia": value if key != "url" else f"<a href='{value}' target='_blank' >{value}</a>",
-                        "wikidata": EMPTY_VALUE
-                    })
-                return table
-            else:
-                reference = details['wikidata']['references'][row - len(details_names) - len(references_wikipedia)]
-                table = []
-                for key, value in reference.items():
-                    if value is None:
-                        continue
-                    table.append({
-                        "property": key,
-                        "wikipedia": EMPTY_VALUE,
-                        "wikidata": value if key != "url" else f"<a href='{value}' target='_blank' >{value}</a>"
-                    })
+            reference = references[row - len(details_names)]
+            table = []
+            for prop in ["url", "name", "publisher"]:
+                table.append({
+                    "property": prop,
+                    "wikipedia": mask_none(mask_url(reference.get('wikipedia', {}).get(prop), prop)),
+                    "wikidata": mask_none(mask_url(reference.get('wikidata', {}).get(prop), prop)),
+                })
                 return table
         return None
-
 
     @_app.callback(
         Output('dash-table-details', 'data', allow_duplicate=True),
@@ -401,44 +398,38 @@ def callbacks(_app: Dash):
             return None, None, True, False
 
         row = active_cell['row']
-        details = twins_details[row]
+        name = twins_names[row]
+        details = twins_details[name['idx']]
+
         table = []
         for details_name in details_names:
-            field_wikipedia = details['wikipedia'][details_name] if details['wikipedia'] is not None else None
-            field_wikidata = details['wikidata'][details_name] if details['wikidata'] is not None else None
-            if details_name == "url":
-                field_wikipedia = f"<a href='{field_wikipedia}' target='_blank' >{field_wikipedia}</a>" if field_wikipedia is not None else EMPTY_VALUE
-                field_wikidata = f"<a href='{field_wikidata}' target='_blank' >{field_wikidata}</a>" if field_wikidata is not None else EMPTY_VALUE
             table.append({
                 "property": details_name,
-                "wikipedia": field_wikipedia if field_wikipedia is not None else EMPTY_VALUE,
-                "wikidata": field_wikidata if field_wikidata is not None else EMPTY_VALUE
+                "wikipedia": mask_none(mask_url(details.get('wikipedia', {}).get(details_name), details_name)),
+                "wikidata": mask_none(mask_url(details.get('wikidata', {}).get(details_name), details_name)),
             })
-        global references_wikipedia
-        if details['wikipedia'] is not None:
-            references_wikipedia = graph.get_references(city_url, details['wikipedia']['url'])
-            for reference in references_wikipedia:
-                table.append({
-                    "property": "reference",
 
-                    "wikipedia": reference['name'],
-                    "wikidata": EMPTY_VALUE
-                })
-        else:
-            references_wikipedia = []
-        if details['wikidata'] is not None:
-            for reference in details['wikidata']['references']:
-                table.append({
-                    "property": "reference",
-                    "wikipedia": EMPTY_VALUE,
-                    "wikidata": reference['name'] if reference['name'] is not None else reference['url']
-                })
+        references_wikipedia = []
+        if 'wikipedia' in details:
+            references_wikipedia = graph.get_references(city_url, details['wikipedia']['url'])
+
+        references_wikidata = []
+        if 'wikidata' in details:
+            references_wikidata = details['wikidata']['references']
+
+        global references
+        references = align(references_wikidata, references_wikipedia)
+        for reference in references:
+            table.append({
+                "property": "reference",
+                "wikipedia": mask_none(reference.get('wikipedia', {}).get('name')),
+                "wikidata": mask_none(reference.get('wikidata', {}).get('name', reference.get('wikidata', {}).get('url'))),
+            })
 
         button_hidden = True
         if twins_names[row]['wikipedia'] is not None and twins_names[row]['wikidata'] is None:
             button_hidden = False
         return table, None, button_hidden, False
-
 
     @_app.callback(
         Output('dash-table', 'data', allow_duplicate=True),
@@ -448,13 +439,13 @@ def callbacks(_app: Dash):
     def update_table_hide(on):
         global twins_names
         twins_names = []
-        for result in twins_details:
-            if on and result['wikidata'] is not None:
+        for i, result in enumerate(twins_details):
+            if on and 'wikidata' in result:
                 continue
-            twins_names.append({"wikipedia": result['wikipedia']['name'] if result['wikipedia'] is not None else None,
-                                "wikidata": result['wikidata']['name'] if result['wikidata'] is not None else None})
+            twins_names.append({"wikipedia": result.get('wikipedia', {}).get('name'),
+                                "wikidata": result.get('wikidata', {}).get('name'),
+                                "idx": i})
         return twins_names
-
 
     @_app.callback(
         Output('dash-table', 'data'),
@@ -475,12 +466,13 @@ def callbacks(_app: Dash):
         data_wikipedia = load_twins_wikipedia(city_url)
 
         global twins_details, twins_names
-        twins_details = align_twins(data_wikidata, data_wikipedia)
+        twins_details = align(data_wikidata, data_wikipedia)
         twins_names = []
 
-        for result in twins_details:
-            twins_names.append({"wikipedia": result['wikipedia']['name'] if result['wikipedia'] is not None else None,
-                                "wikidata": result['wikidata']['name'] if result['wikidata'] is not None else None})
+        for i, result in enumerate(twins_details):
+            twins_names.append({"wikipedia": result.get('wikipedia', {}).get('name'),
+                                "wikidata": result.get('wikidata', {}).get('name'),
+                                "idx": i})
         return twins_names, None, None, False, True, False
 
 
