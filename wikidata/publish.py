@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
 from wikidataintegrator.wdi_core import WDTime, WDUrl, WDMonolingualText, WDString
 
-from queries import extract_id_from_url
+from .queries import extract_id_from_url
 
 
 class Publisher:
@@ -78,7 +78,8 @@ class Publisher:
                     pass
             raise ValueError('No valid date format found')
 
-        date = convert_string_to_date(date_string)
+        dates = [convert_string_to_date(date_string) for date_string in date_string.split(" ")]
+        date = max(dates)
         date_iso = date.strftime("+%Y-%m-%dT%H:%M:%SZ")
 
         return wdi_core.WDTime(time=date_iso, prop_nr=self.PROPS["retrieved"], precision=11, is_reference=True)
@@ -120,10 +121,13 @@ class Publisher:
         twin_city = wdi_core.WDItemID(value=target_id, prop_nr=self.PROPS["twin_city"],
                                       references=references)
         new_item = wdi_core.WDItemEngine(data=[twin_city], wd_item_id=item.wd_item_id)
-        wdi_helpers.try_write(new_item, item.wd_item_id, record_prop=self.PROPS['twin_city'],
+        result = wdi_helpers.try_write(new_item, item.wd_item_id, record_prop=self.PROPS['twin_city'],
                               login=self.login, edit_summary=f"Added twin city {twin['name']}")
+        if isinstance(result, Exception):
+            raise Exception(result.wd_error_msg["error"]["info"])
+        return result
 
-    def update(self, data: dict, two_sided: bool = True):
+    def update(self, data: dict, two_sided: bool = True) -> bool:
         source_id =data.get("sourceId")
         source_id = source_id.split("/")[-1] if source_id is not None else extract_id_from_url(data["sourceUrl"])[0]
         target_id = extract_id_from_url(data["twin"]["url"])[0]
@@ -134,22 +138,30 @@ class Publisher:
             data["targetId"] = source_id
             item = self.load(target_id)
             self._update(item, data)
+        return True
 
 
 if __name__ == '__main__':
     publisher = Publisher()
     data = {
-        "sourceUrl": "https://en.wikipedia.org/wiki/Lichtenberg",
-        "sourceId": "http://www.wikidata.org/entity/Q329609",
+        "sourceUrl": "https://en.wikipedia.org/wiki/Marzahn-Hellersdorf",
         "twin": {
-            "url": "https://en.wikipedia.org/wiki/Hoàn_Kiếm_district",
-                # <https://en.wikipedia.org/wiki/Hoàn_Kiếm_district>
-            "name": "Hoàn Kiếm (Hanoi)",
-            "country": "Vietnam",
-            "sourcePage": None,
-            "sourceType": None,
-            "wikiText": "Hoàn Kiếm District",
-            "references": []
+            "url": "https://en.wikipedia.org/wiki/Tychy",
+            "name": "Tychy",
+            "country": "Poland",
+            "sourcePage": "List of twin towns and sister cities in Poland",
+            "sourceType": "country",
+            "wikiText": "Tychy",
+            "references": [
+                {
+                    "name": "Miasta partnerskie",
+                    "url": "https://umtychy.pl/artykul/108/miasta-partnerskie",
+                    "publisher": "Tychy",
+                    "language": "pl",
+                    "accessDate": "2019-09-21",
+                    "date": None
+                }
+            ]
         }
     }
 
