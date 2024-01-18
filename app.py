@@ -5,16 +5,19 @@ import urllib.parse
 from dash import Dash, dcc, html, dash_table
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
+import dash_bootstrap_components as dbc
 import dash_daq as daq
 
 from grapher.twin_cities_graph import TwinCitiesGraph
 from wikidata import queries as q
+from wikidata.publish import Publisher
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-app = Dash(__name__)
+app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+publisher = Publisher()
 
 
 def load_graph() -> TwinCitiesGraph:
@@ -157,6 +160,7 @@ table_right_config = dict(
 EMPTY_VALUE = ""
 
 app.layout = html.Div([
+    dcc.Store(id='memory'),
     html.Div([
         dcc.Dropdown(id='city-url', options=[], placeholder='Select a city'),
         html.Button('Run Query', id='run-button', style={'margin-top': '10px', 'margin-bottom': '10px'}),
@@ -205,7 +209,11 @@ app.layout = html.Div([
         dash_table.DataTable(id='dash-table-refs',
                              **table_right_config),
         html.Button('Update Wikidata', id='update-button', hidden=True, disabled=False,
-                    style={'margin-top': '10px', 'margin-bottom': '10px'})
+                    style={'margin-top': '10px', 'margin-bottom': '10px'}),
+        dbc.Alert("ERROR !!! Something went wrong.", id='error_alert', is_open=False, fade=True, dismissable=True,
+                  style={'margin-top': '10px', 'margin-bottom': '10px'}, color='danger'),
+        dbc.Alert("Update performed successfully !!!", id='success_alert', is_open=False, fade=True, dismissable=True,
+                  style={'margin-top': '10px', 'margin-bottom': '10px'}, color='success')
     ],
         style={'width': '50%', 'display': 'inline-block', 'margin-left': '5%'}
     )],
@@ -215,6 +223,7 @@ app.layout = html.Div([
 
 @app.callback(
     Output('update-button', 'disabled', allow_duplicate=True),
+    Output('memory', 'data'),
     Input('update-button', 'n_clicks'),
     State('city-url', 'value'),
     State('dash-table', 'active_cell'),
@@ -241,9 +250,35 @@ def query(n_clicks, city_url, active_cell):
             "references": references_wikipedia
         }
     }
-    print(update_object)
-    # TODO: call query
-    return True
+    try:
+        res = publisher.update(update_object)
+        return True, res
+    except Exception as e:
+        message = str(e)
+        return True, message
+
+
+@app.callback(
+    [Output('error_alert', 'is_open'), Output('error_alert', 'children')],
+    Input('memory', 'data'),
+    prevent_initial_call=True,
+)
+def show_error_alert(data):
+    if isinstance(data, str):
+        return True, data
+    return False, ""
+
+
+@app.callback(
+    Output('success_alert', 'is_open'),
+    Output('success_alert', 'children'),
+    Input('memory', 'data'),
+    prevent_initial_call=True
+)
+def show_success_alert(data):
+    if isinstance(data, bool) and data:
+        return True, "Updated successfully"
+    return False, ""
 
 
 @app.callback(
