@@ -106,14 +106,11 @@ class Publisher:
             reference.append(self._parse_date(access_data))
         if (referenceURL := data.get("referenceURL")) is not None:
             reference.append(
-                wdi_core.WDUrl(value=data["referenceURL"], prop_nr=self.PROPS["referenceURL"], is_reference=True))
-        if data.get("title") is not None:
-            if data.get("language") is not None:
-                reference.append(wdi_core.WDMonolingualText(value=data["title"], prop_nr=self.PROPS["title"],
-                                                            is_reference=True, language=data["language"]))
-            else:
-                reference.append(wdi_core.WDString(value=data["title"], prop_nr=self.PROPS["title"],
-                                                   is_reference=True))  # TODO: verify
+                wdi_core.WDUrl(value=referenceURL, prop_nr=self.PROPS["referenceURL"], is_reference=True))
+        if (title := data.get("name")) is not None:
+            lang = data.get("language", "en")
+            reference.append(wdi_core.WDMonolingualText(value=title, prop_nr=self.PROPS["title"],
+                                                        is_reference=True, language=lang))
         return reference
 
     def _update(self, item: wdi_core.WDItemEngine, data: dict) -> None:
