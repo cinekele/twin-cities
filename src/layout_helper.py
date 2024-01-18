@@ -9,6 +9,7 @@ import dash_bootstrap_components as dbc
 def run_standalone_app(
         layout,
         callbacks,
+        app_name,
         header_colors,
         filename
 ):
@@ -19,7 +20,7 @@ def run_standalone_app(
     app.config['suppress_callback_exceptions'] = True
 
     # Get all information from filename
-    app_name = os.getenv('DASH_APP_NAME', '')
+    app_name = os.getenv('DASH_APP_NAME', app_name)
     if app_name == '':
         app_name = os.path.basename(os.path.dirname(filename))
     app_name = app_name.replace('dash-', '')
@@ -56,21 +57,21 @@ def app_page_layout(page_layout,
             html.Div(
                 id='app-page-header',
                 children=[
-                    html.A(
-                        id='dashbio-logo', children=[
-                            html.Img(
-                                src='data:image/png;base64,{}'.format(
-                                    base64.b64encode(
-                                        open(
-                                            './assets/plotly-dash-logo.png', 'rb'
-                                        ).read()
-                                    ).decode()
-                            ),
-                        )],
-                        href="/Portal" if standalone else "/dash-bio"
-                    ),
+                    # html.A(
+                    #     id='dashbio-logo', children=[
+                    #         html.Img(
+                    #             src='data:image/png;base64,{}'.format(
+                    #                 base64.b64encode(
+                    #                     open(
+                    #                         './assets/plotly-dash-logo.png', 'rb'
+                    #                     ).read()
+                    #                 ).decode()
+                    #         ),
+                    #     )],
+                    #     href="/Portal" if standalone else "/dash-bio"
+                    # ),
                     html.H2(
-                        app_title
+                        app_title, style={'padding-left': '10px'}
                     ),
 
                     html.A(

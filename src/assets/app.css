@@ -275,3 +275,8 @@
     margin-left: 10px;
     margin-right: 10px;
 }
+
+.table {
+    background-color: #f6f6f6;
+    --bs-table-bg: #f6f6f6;
+}
