@@ -124,7 +124,8 @@ class Publisher:
                               login=self.login, edit_summary=f"Added twin city {twin['name']}")
 
     def update(self, data: dict, two_sided: bool = True):
-        source_id = data.get("sourceId").split("/")[-1] if "sourceId" in data else extract_id_from_url(data["sourceUrl"])[0]
+        source_id =data.get("sourceId")
+        source_id = source_id.split("/")[-1] if source_id is not None else extract_id_from_url(data["sourceUrl"])[0]
         target_id = extract_id_from_url(data["twin"]["url"])[0]
         data["targetId"] = target_id
         item = self.load(source_id)
