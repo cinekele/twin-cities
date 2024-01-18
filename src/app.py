@@ -14,7 +14,6 @@ from wikidata.publish import Publisher
 
 from layout_helper import run_standalone_app
 
-
 EMPTY_VALUE = ""
 
 DEBUG = True if os.getenv("PROD_MODE",False) != False else False
@@ -141,7 +140,7 @@ def mask_none(value: str | None) -> str:
 twins_details: list[dict[str, dict[str, str]]] = []
 twins_names: list[dict[str, str | int]] = []
 references: list[dict[str, dict[str, str]]] = []
-details_names = ["name", "url"]
+references_names = ["url", "name", "publisher"]
 
 
 def setup():
@@ -150,28 +149,15 @@ def setup():
     city_urls = load_cities()
 
 
-table_right_config = dict(
-    markdown_options={'html': True},
-    columns=[{"name": "Property", "id": "property"},
-             {"name": "Wikipedia", "id": "wikipedia", "presentation": "markdown", "type": "text"},
-             {"name": "Wikidata", "id": "wikidata", "presentation": "markdown", "type": "text"}],
-    style_cell={'textAlign': 'left'},  # , 'width': '33%'
-    style_data={'whiteSpace': 'normal'},  # , 'height': 'auto'
-    style_table={'margin-top': '10px'},  # , 'width': '100%'
-    style_data_conditional=[
-        {
-            'if': {
-                'state': 'selected',
-            },
-            'backgroundColor': 'rgba(75, 75, 255, 0.2)',
-            'border': '1px solid rgb(75, 75, 255)',
-        }
-    ],
-    css=[{'selector': 'table', 'rule': 'table-layout: fixed'},
-         {'selector': '.dash-cell div.dash-cell-value', 'rule': 'overflow-wrap: break-word'},
-         {'selector': 'p', 'rule': 'margin: 0'},
-         {'selector': 'div.dash-cell-value.cell-markdown', 'rule': 'font-family: monospace'}]
-)
+STYLE_DATA_CONDITIONAL = [
+    {
+        'if': {
+            'state': 'selected',
+        },
+        'backgroundColor': 'rgba(75, 75, 255, 0.2)',
+        'border': '1px solid rgb(75, 75, 255)',
+    },
+]
 
 
 def layout():
@@ -226,40 +212,42 @@ def layout():
                                                   style={'margin-top': '10px', 'margin-bottom': '10px'}),
                                 html.Div(id='output-table', className='table twin-cities-table', children=[
                                     dash_table.DataTable(id='dash-table',
-                                                        columns=[{"name": i, "id": i.lower()} for i in ["Wikipedia", "Wikidata"]],
-                                                        row_selectable="single",
-                                                        fixed_rows={'headers': True},
-                                                        style_cell={'textAlign': 'left', 'width': '50%', 'max-height': '300px', 'overflow': 'auto'},
-                                                        style_data_conditional=[
-                                                            {
-                                                                'if': {
-                                                                    'filter_query': '{wikipedia} is nil',
-                                                                    'column_id': 'wikipedia',
-                                                                },
-                                                                'backgroundColor': 'rgb(255, 175, 175, 0.5)',
-                                                            },
-                                                            {
-                                                                'if': {
-                                                                    'filter_query': '{wikidata} is nil',
-                                                                    'column_id': 'wikidata',
-                                                                },
-                                                                'backgroundColor': 'rgb(175, 255, 175, 0.5)',
-                                                            },
-                                                            {
-                                                                'if': {
-                                                                    'filter_query': '!({wikipedia} is nil) && {wikidata} is nil',
-                                                                    'column_id': 'wikipedia',
-                                                                },
-                                                                'backgroundColor': 'rgba(255, 175, 175, 0.5)',
-                                                            },
-                                                            {
-                                                                'if': {
-                                                                    'state': 'selected',
-                                                                },
-                                                                'backgroundColor': 'rgba(75, 75, 255, 0.2)',
-                                                                'border': '1px solid rgb(75, 75, 255)',
-                                                            }
-                                                        ]),
+                                                         columns=[{"name": i, "id": i.lower()} for i in
+                                                                  ["Wikipedia", "Wikidata"]],
+                                                         row_selectable="single",
+                                                         fixed_rows={'headers': True},
+                                                         style_cell={'textAlign': 'left', 'width': '50%',
+                                                                     'max-height': '300px', 'overflow': 'auto'},
+                                                         style_data_conditional=[
+                                                             {
+                                                                 'if': {
+                                                                     'filter_query': '{wikipedia} is nil',
+                                                                     'column_id': 'wikipedia',
+                                                                 },
+                                                                 'backgroundColor': 'rgb(255, 175, 175, 0.5)',
+                                                             },
+                                                             {
+                                                                 'if': {
+                                                                     'filter_query': '{wikidata} is nil',
+                                                                     'column_id': 'wikidata',
+                                                                 },
+                                                                 'backgroundColor': 'rgb(175, 255, 175, 0.5)',
+                                                             },
+                                                             {
+                                                                 'if': {
+                                                                     'filter_query': '!({wikipedia} is nil) && {wikidata} is nil',
+                                                                     'column_id': 'wikipedia',
+                                                                 },
+                                                                 'backgroundColor': 'rgba(255, 175, 175, 0.5)',
+                                                             },
+                                                             {
+                                                                 'if': {
+                                                                     'state': 'selected',
+                                                                 },
+                                                                 'backgroundColor': 'rgba(75, 75, 255, 0.2)',
+                                                                 'border': '1px solid rgb(75, 75, 255)',
+                                                             }
+                                                         ]),
                                 ], style={'margin-top': '10px', 'margin-bottom': '10px'}),
                                 # style={'height': '100%', 'width': '40%', 'display': 'inline-block', 'vertical-align': 'top'}
                             ])
@@ -272,32 +260,48 @@ def layout():
                                     className='what-is',
                                     children='References and their properties'
                                 ),
-                                
+
                                 html.Button('Select all properties', id='select-all-button', className='three columns'),
-                                html.Button('Deselect all properties', id='deselect-all-button', className='three columns'),
+                                html.Button('Deselect all properties', id='deselect-all-button',
+                                            className='three columns'),
                                 html.Div([
-                                    dash_table.DataTable(id='dash-table-details',
-                                                        row_selectable="multi",
-                                                        # selected_rows=[],
-                                                        **table_right_config),
+                                    html.Div(id='dash-div-details'),
                                     dash_table.DataTable(id='dash-table-refs',
-                                                        row_selectable="multi",
-                                                        **table_right_config),
+                                                         row_selectable="multi",
+                                                         markdown_options={'html': True},
+                                                         columns=[{"name": "Property", "id": "property"},
+                                                                  {"name": "Wikipedia", "id": "wikipedia",
+                                                                   "presentation": "markdown", "type": "text"},
+                                                                  {"name": "Wikidata", "id": "wikidata",
+                                                                   "presentation": "markdown", "type": "text"}],
+                                                         style_cell={'textAlign': 'left'},  # , 'width': '33%'
+                                                         style_data={'whiteSpace': 'normal'},  # , 'height': 'auto'
+                                                         style_table={'margin-top': '10px'},  # , 'width': '100%'
+                                                         style_data_conditional=STYLE_DATA_CONDITIONAL,
+                                                         css=[{'selector': 'table', 'rule': 'table-layout: fixed'},
+                                                              {'selector': '.dash-cell div.dash-cell-value',
+                                                               'rule': 'overflow-wrap: break-word'},
+                                                              {'selector': 'p', 'rule': 'margin: 0'},
+                                                              {'selector': 'div.dash-cell-value.cell-markdown',
+                                                               'rule': 'font-family: monospace'}]
+                                                         ),
                                     html.Button('Update Wikidata', id='update-button', hidden=True, disabled=False,
                                                 style={'margin-top': '10px', 'margin-bottom': '10px'}),
-                                    dbc.Alert("ERROR !!! Something went wrong.", id='error_alert', is_open=False, fade=True, dismissable=True,
-                                            style={'margin-top': '10px', 'margin-bottom': '10px'}, color='danger'),
-                                    dbc.Alert("Update performed successfully !!!", id='success_alert', is_open=False, fade=True, dismissable=True,
-                                            style={'margin-top': '10px', 'margin-bottom': '10px'}, color='success')
+                                    dbc.Alert("ERROR !!! Something went wrong.", id='error_alert', is_open=False,
+                                              fade=True, dismissable=True,
+                                              style={'margin-top': '10px', 'margin-bottom': '10px'}, color='danger'),
+                                    dbc.Alert("Update performed successfully !!!", id='success_alert', is_open=False,
+                                              fade=True, dismissable=True,
+                                              style={'margin-top': '10px', 'margin-bottom': '10px'}, color='success')
                                 ],
-                                    #style={'width': '50%', 'display': 'inline-block', 'margin-left': '5%'}
+                                    # style={'width': '50%', 'display': 'inline-block', 'margin-left': '5%'}
                                 )
                             ]))
-                        ]
-                    )
-                ]),
-            ])
-            ])
+                    ]
+                )
+            ]),
+        ])
+    ])
 
 
 def callbacks(_app: Dash):
@@ -373,51 +377,34 @@ def callbacks(_app: Dash):
         return out
 
     @_app.callback(
+        Output('dash-div-details', 'children', allow_duplicate=True),
         Output('dash-table-refs', 'data', allow_duplicate=True),
-        Input('dash-table-details', 'active_cell'),
-        prevent_initial_call=True,
-    )
-    def update_refs(active_cell):
-        if active_cell is None:
-            return None
-
-        row = active_cell['row']
-        if row >= len(details_names):
-            reference = references[row - len(details_names)]
-            table = []
-            for prop in ["url", "name", "publisher"]:
-                table.append({
-                    "property": prop,
-                    "wikipedia": mask_none(mask_url(reference.get('wikipedia', {}).get(prop), prop)),
-                    "wikidata": mask_none(mask_url(reference.get('wikidata', {}).get(prop), prop)),
-                })
-                return table
-        return None
-
-    @_app.callback(
-        Output('dash-table-details', 'data', allow_duplicate=True),
-        Output('dash-table-refs', 'data', allow_duplicate=True),
+        Output('dash-table-refs', 'style_data_conditional'),
         Output('update-button', 'hidden', allow_duplicate=True),
         Output('update-button', 'disabled', allow_duplicate=True),
         Input('dash-table', 'selected_rows'),
         State('city-url', 'value'),
         prevent_initial_call=True,
     )
-    def update_details(selected_rows, city_url):
+    def update_details_refs(selected_rows, city_url):
         if selected_rows is None or len(selected_rows) == 0:
-            return None, None, True, False
+            return None, None, STYLE_DATA_CONDITIONAL, True, False
 
         row = selected_rows[0]
         name = twins_names[row]
         details = twins_details[name['idx']]
 
-        table = []
-        for details_name in details_names:
-            table.append({
-                "property": details_name,
-                "wikipedia": mask_none(mask_url(details.get('wikipedia', {}).get(details_name), details_name)),
-                "wikidata": mask_none(mask_url(details.get('wikidata', {}).get(details_name), details_name)),
-            })
+        div = {
+            "name": {
+                "wikipedia": mask_none(details.get('wikipedia', {}).get("name")),
+                "wikidata": mask_none(details.get('wikidata', {}).get("name")),
+            },
+            "url": {
+                "wikipedia": mask_none(mask_url(details.get('wikipedia', {}).get("url"), "url")),
+                "wikidata": mask_none(mask_url(details.get('wikidata', {}).get("targetId"), "url")),
+            },
+        }
+        div = str(div)
 
         references_wikipedia = []
         if 'wikipedia' in details:
@@ -429,17 +416,29 @@ def callbacks(_app: Dash):
 
         global references
         references = align(references_wikidata, references_wikipedia)
+
+        table = []
         for reference in references:
-            table.append({
-                "property": "reference",
-                "wikipedia": mask_none(reference.get('wikipedia', {}).get('name')),
-                "wikidata": mask_none(reference.get('wikidata', {}).get('name', reference.get('wikidata', {}).get('url'))),
-            })
+            for prop in references_names:
+                table.append({
+                    "property": prop,
+                    "wikipedia": mask_none(mask_url(reference.get('wikipedia', {}).get(prop), prop)),
+                    "wikidata": mask_none(mask_url(reference.get('wikidata', {}).get(prop), prop)),
+                })
+        _style_data_conditional = [
+            *STYLE_DATA_CONDITIONAL,
+            {
+                'if': {
+                    'row_index': [i for i in range(len(references) * len(references_names)) if (i // len(references_names)) % 2 == 0],
+                },
+                'backgroundColor': 'rgb(220, 220, 220)',
+            },
+        ]
 
         button_hidden = True
         if twins_names[row]['wikipedia'] is not None and twins_names[row]['wikidata'] is None:
             button_hidden = False
-        return table, None, button_hidden, False
+        return div, table, _style_data_conditional, button_hidden, False
 
     @_app.callback(
         Output('dash-table', 'data', allow_duplicate=True),
@@ -459,7 +458,7 @@ def callbacks(_app: Dash):
 
     @_app.callback(
         Output('dash-table', 'data'),
-        Output('dash-table-details', 'data'),
+        Output('dash-div-details', 'children'),
         Output('dash-table-refs', 'data'),
         Output('hide-switch', 'on'),
         Output('update-button', 'hidden'),
@@ -486,15 +485,16 @@ def callbacks(_app: Dash):
         return twins_names, None, None, False, True, False
 
     @_app.callback(
-        Output('dash-table-details', 'selected_rows'),
+        Output('dash-table-refs', 'selected_rows'),
         Input('select-all-button', 'n_clicks'),
         Input('deselect-all-button', 'n_clicks'),
-        State('dash-table-details', 'data'),
-        State('dash-table-details', 'derived_virtual_data'),
-        State('dash-table-details', 'derived_virtual_selected_rows')
+        State('dash-table-refs', 'data'),
+        State('dash-table-refs', 'derived_virtual_data'),
+        State('dash-table-refs', 'derived_virtual_selected_rows')
     )
     def selection(select_n_clicks, deselect_n_clicks, original_rows, filtered_rows, selected_rows):
-        print(f"select_n_clicks: {select_n_clicks}, deselect_n_clicks: {deselect_n_clicks}, original_rows: {original_rows}, filtered_rows: {filtered_rows}, selected_rows: {selected_rows}")
+        print(
+            f"select_n_clicks: {select_n_clicks}, deselect_n_clicks: {deselect_n_clicks}, original_rows: {original_rows}, filtered_rows: {filtered_rows}, selected_rows: {selected_rows}")
         ctx = callback_context.triggered[0]
         ctx_caller = ctx['prop_id']
         if filtered_rows is not None:
@@ -506,6 +506,7 @@ def callbacks(_app: Dash):
             raise PreventUpdate
         else:
             raise PreventUpdate
+
 
 app = run_standalone_app(layout, callbacks, "Twin Cities", header_colors, __file__)
 app.title = "Twin Cities"
