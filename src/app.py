@@ -393,7 +393,6 @@ def layout():
                                                             "Update Wikidata",
                                                             id="update-button",
                                                             hidden=True,
-                                                            disabled=False,
                                                             style={
                                                                 "margin-top": "10px",
                                                                 "margin-bottom": "10px",
@@ -441,7 +440,7 @@ def layout():
 
 def callbacks(_app: Dash):
     @_app.callback(
-        Output("update-button", "disabled", allow_duplicate=True),
+        Output("update-button", "hidden", allow_duplicate=True),
         Output("memory", "data"),
         Input("update-button", "n_clicks"),
         State("city-url", "value"),
@@ -458,7 +457,7 @@ def callbacks(_app: Dash):
             or selected_rows_refs is None
             or len(selected_rows_refs) == 0
         ):
-            return False
+            return False, None
 
         source_id = None
         for details in twins_details:
@@ -529,15 +528,13 @@ def callbacks(_app: Dash):
         Output("dash-div-details", "children", allow_duplicate=True),
         Output("dash-table-refs", "data", allow_duplicate=True),
         Output("dash-table-refs", "style_data_conditional"),
-        Output("update-button", "hidden", allow_duplicate=True),
-        Output("update-button", "disabled", allow_duplicate=True),
         Input("dash-table", "selected_rows"),
         State("city-url", "value"),
         prevent_initial_call=True,
     )
     def update_details_refs(selected_rows, city_url):
         if selected_rows is None or len(selected_rows) == 0:
-            return None, None, STYLE_DATA_CONDITIONAL, True, False
+            return None, None, STYLE_DATA_CONDITIONAL
 
         row = selected_rows[0]
         name = twins_names[row]
@@ -599,14 +596,17 @@ def callbacks(_app: Dash):
                 "backgroundColor": "rgb(220, 220, 220)",
             },
         ]
+        return div, table, _style_data_conditional
 
-        button_hidden = True
-        if (
-            twins_names[row]["wikipedia"] is not None
-            and twins_names[row]["wikidata"] is None
-        ):
-            button_hidden = False
-        return div, table, _style_data_conditional, button_hidden, False
+    @_app.callback(
+        Output("update-button", "hidden", allow_duplicate=True),
+        Input("dash-table-refs", "selected_rows"),
+        prevent_initial_call=True,
+    )
+    def update_button_hide(selected_rows):
+        if selected_rows is None or len(selected_rows) == 0:
+            return True
+        return False
 
     @_app.callback(
         Output("dash-table", "data", allow_duplicate=True),
@@ -634,14 +634,13 @@ def callbacks(_app: Dash):
         Output("dash-table-refs", "data"),
         Output("hide-switch", "on"),
         Output("update-button", "hidden"),
-        Output("update-button", "disabled"),
         Input("run-button", "n_clicks"),
         State("city-url", "value"),
         prevent_initial_call=True,
     )
     def update_table(n_clicks, city_url):
         if n_clicks is None:
-            return None, None, None, False, True, False  # Not clicked yet
+            return None, None, None, False, True  # Not clicked yet
 
         data_wikidata = load_twins_wikidata(city_url)
         data_wikipedia = load_twins_wikipedia(city_url)
@@ -658,7 +657,7 @@ def callbacks(_app: Dash):
                     "idx": i,
                 }
             )
-        return twins_names, None, None, False, True, False
+        return twins_names, None, None, False, True
 
     @_app.callback(
         Output("dash-table-refs", "selected_rows"),
