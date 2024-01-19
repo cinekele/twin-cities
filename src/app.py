@@ -788,6 +788,7 @@ app.title = "Twin Cities"
 server = app.server
 publisher = Publisher()
 DEBUG = False if os.getenv("PROD_MODE") else True
+setup()
+
 if __name__ == "__main__":
-    setup()
-    app.run_server(debug=DEBUG)
+    app.run(debug=DEBUG)

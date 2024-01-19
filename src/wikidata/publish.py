@@ -90,7 +90,7 @@ class Publisher:
         )
 
     def _create_reference(
-            self, data: dict
+        self, data: dict
     ) -> list[WDTime | WDUrl | WDMonolingualText | WDString]:
         """
         Creates a reference for a given item.
@@ -110,9 +110,9 @@ class Publisher:
         """
 
         reference = []
-        if (access_data := data.get("accessDate")) is not None:
+        if access_data := data.get("accessDate"):
             reference.append(self._parse_date(access_data))
-        if (referenceURL := data.get("url")) is not None:
+        if referenceURL := data.get("url"):
             reference.append(
                 wdi_core.WDUrl(
                     value=referenceURL,
@@ -120,7 +120,7 @@ class Publisher:
                     is_reference=True,
                 )
             )
-        if (title := data.get("name")) is not None:
+        if title := data.get("name"):
             lang = data.get("language", "en") or "en"
             reference.append(
                 wdi_core.WDMonolingualText(

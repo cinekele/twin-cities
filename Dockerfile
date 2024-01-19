@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image
-FROM python:3.10-slim-bookworm
+FROM python:3.11-slim-bookworm
 
 # Set environment variables
 ENV PROD_MODE 1
@@ -23,4 +23,4 @@ RUN mkdir -p /app/data
 EXPOSE 8050
 
 # Scrape data and create graph, and run app.py when the container launches
-CMD ["/bin/bash", "-c", "python scrape_to_graph.py && python app.py"]
+CMD ["/bin/bash", "-c", "python scrape_to_graph.py && gunicorn -b 0.0.0.0:8050 app:server"]
