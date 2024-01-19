@@ -145,7 +145,7 @@ def mask_none(value: str | None) -> str:
 twins_details: list[dict[str, dict[str, str]]] = []
 twins_names: list[dict[str, str | int]] = []
 references: list[dict[str, dict[str, str]]] = []
-references_names = ["url", "name", "publisher"]
+references_names = ["url", "name", "website", "publisher", "language", "accessDate", "date"]
 
 
 def setup():
@@ -446,14 +446,17 @@ def callbacks(_app: Dash):
         Input("update-button", "n_clicks"),
         State("city-url", "value"),
         State("dash-table", "selected_rows"),
+        State("dash-table-refs", "selected_rows"),
         prevent_initial_call=True,
     )
-    def query(n_clicks, city_url, selected_rows):
+    def query(n_clicks, city_url, selected_rows, selected_rows_refs):
         if (
             n_clicks is None
             or city_url is None
             or selected_rows is None
             or len(selected_rows) == 0
+            or selected_rows_refs is None
+            or len(selected_rows_refs) == 0
         ):
             return False
 
@@ -466,14 +469,21 @@ def callbacks(_app: Dash):
         row = selected_rows[0]
         details = twins_details[row]
 
+        refs = {}
+        for i in selected_rows_refs:
+            ref_i = i // len(references_names)
+            if "wikipedia" in references[ref_i]:
+                refs[ref_i] = {
+                    **refs.get(ref_i, {}),
+                    references_names[i % len(references_names)]: references[ref_i]["wikipedia"][references_names[i % len(references_names)]],
+                }
+
         update_object = {
             "sourceUrl": city_url,
             "sourceId": source_id,
             "twin": {
                 **details.get("wikipedia", {}),
-                "references": [
-                    ref["wikipedia"] for ref in references if "wikipedia" in ref
-                ],
+                "references": list(refs.values()),
             },
         }
         try:
