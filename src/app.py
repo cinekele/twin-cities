@@ -16,8 +16,6 @@ from layout_helper import run_standalone_app
 
 EMPTY_VALUE = ""
 
-DEBUG = False if os.getenv("PROD_MODE") else True
-
 
 def header_colors():
     return {
@@ -68,15 +66,17 @@ def load_twins_wikidata(city_url: str) -> list[dict[str, str | list[dict[str, st
             and raw[i]["targetId"] == raw[i - 1]["targetId"]
             and "referenceUrl" in raw[i]
         ):
-            data_wikidata[-1]["references"].append({
-                "url": raw[i].pop("referenceUrl"),
-                "name": raw[i].pop("referenceName")
-                if "referenceName" in raw[i]
-                else None,
-                "publisher": raw[i].pop("referencePublisher")
-                if "referencePublisher" in raw[i]
-                else None,
-            })
+            data_wikidata[-1]["references"].append(
+                {
+                    "url": raw[i].pop("referenceUrl"),
+                    "name": raw[i].pop("referenceName")
+                    if "referenceName" in raw[i]
+                    else None,
+                    "publisher": raw[i].pop("referencePublisher")
+                    if "referencePublisher" in raw[i]
+                    else None,
+                }
+            )
         else:
             data_wikidata.append({**raw[i]})
             data_wikidata[-1]["references"] = []
@@ -635,13 +635,16 @@ def callbacks(_app: Dash):
 
         references_wikipedia = []
         if "wikipedia" in details:
-            references_wikipedia = sorted(graph.get_references(
-                city_url, details["wikipedia"]["url"]
-            ), key=lambda x: x["url"])
+            references_wikipedia = sorted(
+                graph.get_references(city_url, details["wikipedia"]["url"]),
+                key=lambda x: x["url"],
+            )
 
         references_wikidata = []
         if "wikidata" in details:
-            references_wikidata = sorted(details["wikidata"]["references"], key=lambda x: x["url"])
+            references_wikidata = sorted(
+                details["wikidata"]["references"], key=lambda x: x["url"]
+            )
 
         global references
         references = align(references_wikidata, references_wikipedia)
@@ -771,7 +774,7 @@ app = run_standalone_app(layout, callbacks, "Twin Cities", header_colors, __file
 app.title = "Twin Cities"
 server = app.server
 publisher = Publisher()
-
+DEBUG = False if os.getenv("PROD_MODE") else True
 if __name__ == "__main__":
     setup()
     app.run_server(debug=DEBUG)
