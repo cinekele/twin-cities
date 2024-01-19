@@ -16,16 +16,13 @@ class Publisher:
         Initialize the publisher. Sets up the login.
         """
         load_dotenv()
-        login = wdi_login.WDLogin(
-            user=os.getenv("USER"),
-            pwd=os.getenv("PASSWORD")
-        )
+        login = wdi_login.WDLogin(user=os.getenv("USER"), pwd=os.getenv("PASSWORD"))
         self.PROPS = {
             "retrieved": "P813",
             # "publisher": "P123",
             "title": "P1476",
             "referenceURL": "P854",
-            "twin_city": "P190"
+            "twin_city": "P190",
         }
         self.login = login
 
@@ -71,20 +68,30 @@ class Publisher:
         """
 
         def convert_string_to_date(date_string):
-            for fmt in ('%d %B %Y', '%Y-%m-%d'):
+            for fmt in ("%d %B %Y", "%Y-%m-%d"):
                 try:
                     return datetime.strptime(date_string.strip(), fmt)
                 except ValueError:
                     pass
-            raise ValueError('No valid date format found')
+            raise ValueError("No valid date format found")
 
-        dates = [convert_string_to_date(date_string) for date_string in date_string.split(" ")]
+        dates = [
+            convert_string_to_date(date_string)
+            for date_string in date_string.split(" ")
+        ]
         date = max(dates)
         date_iso = date.strftime("+%Y-%m-%dT%H:%M:%SZ")
 
-        return wdi_core.WDTime(time=date_iso, prop_nr=self.PROPS["retrieved"], precision=11, is_reference=True)
+        return wdi_core.WDTime(
+            time=date_iso,
+            prop_nr=self.PROPS["retrieved"],
+            precision=11,
+            is_reference=True,
+        )
 
-    def _create_reference(self, data: dict) -> list[WDTime | WDUrl | WDMonolingualText | WDString]:
+    def _create_reference(
+        self, data: dict
+    ) -> list[WDTime | WDUrl | WDMonolingualText | WDString]:
         """
         Creates a reference for a given item.
 
@@ -105,24 +112,41 @@ class Publisher:
         reference = []
         if (access_data := data.get("accessDate")) is not None:
             reference.append(self._parse_date(access_data))
-        if (referenceURL := data.get("referenceURL")) is not None:
+        if (referenceURL := data.get("url")) is not None:
             reference.append(
-                wdi_core.WDUrl(value=referenceURL, prop_nr=self.PROPS["referenceURL"], is_reference=True))
+                wdi_core.WDUrl(
+                    value=referenceURL,
+                    prop_nr=self.PROPS["url"],
+                    is_reference=True,
+                )
+            )
         if (title := data.get("name")) is not None:
             lang = data.get("language", "en")
-            reference.append(wdi_core.WDMonolingualText(value=title, prop_nr=self.PROPS["title"],
-                                                        is_reference=True, language=lang))
+            reference.append(
+                wdi_core.WDMonolingualText(
+                    value=title,
+                    prop_nr=self.PROPS["title"],
+                    is_reference=True,
+                    language=lang,
+                )
+            )
         return reference
 
     def _update(self, item: wdi_core.WDItemEngine, data: dict) -> None:
         twin = data["twin"]
         target_id = data["targetId"]
         references = [self._create_reference(ref) for ref in twin["references"]]
-        twin_city = wdi_core.WDItemID(value=target_id, prop_nr=self.PROPS["twin_city"],
-                                      references=references)
+        twin_city = wdi_core.WDItemID(
+            value=target_id, prop_nr=self.PROPS["twin_city"], references=references
+        )
         new_item = wdi_core.WDItemEngine(data=[twin_city], wd_item_id=item.wd_item_id)
-        result = wdi_helpers.try_write(new_item, item.wd_item_id, record_prop=self.PROPS['twin_city'],
-                                       login=self.login, edit_summary=f"Added twin city {twin['name']}")
+        result = wdi_helpers.try_write(
+            new_item,
+            item.wd_item_id,
+            record_prop=self.PROPS["twin_city"],
+            login=self.login,
+            edit_summary=f"Added twin city {twin['name']}",
+        )
         if isinstance(result, Exception):
             raise Exception(result.wd_error_msg["error"]["info"])
         return result
@@ -135,7 +159,11 @@ class Publisher:
 
     def update(self, data: dict, two_sided: bool = True) -> bool:
         source_id = data.get("sourceId")
-        source_id = source_id.split("/")[-1] if source_id is not None else self.get_proper_id(data["sourceUrl"])
+        source_id = (
+            source_id.split("/")[-1]
+            if source_id is not None
+            else self.get_proper_id(data["sourceUrl"])
+        )
         target_id = self.get_proper_id(data["twin"]["url"])
         data["targetId"] = target_id
         item = self.load(source_id)
@@ -148,7 +176,7 @@ class Publisher:
         return True
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     publisher = Publisher()
     data = {
         "sourceUrl": "https://en.wikipedia.org/wiki/Marzahn-Hellersdorf",
@@ -166,10 +194,10 @@ if __name__ == '__main__':
                     "publisher": "Tychy",
                     "language": "pl",
                     "accessDate": "2019-09-21",
-                    "date": None
+                    "date": None,
                 }
-            ]
-        }
+            ],
+        },
     }
 
     publisher.update(data)
