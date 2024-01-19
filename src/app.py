@@ -51,7 +51,7 @@ city_urls: list[dict[str, str]] = []
 
 def load_twins_wikidata(city_url: str) -> list[dict[str, str | list[dict[str, str]]]]:
     st = time.perf_counter()
-    raw = sorted(q.get_wikidata_twin_data(city_url), key=lambda x: x["targetLabel"])
+    raw = sorted(q.get_wikidata_twin_data(city_url), key=lambda x: x["targetUrl"])
     print(f"Ran query (wikidata) in {time.perf_counter() - st:0.2f} seconds")
     # remap keys
     data_wikidata = []
@@ -97,7 +97,7 @@ def load_twins_wikidata(city_url: str) -> list[dict[str, str | list[dict[str, st
 
 def load_twins_wikipedia(city_url: str) -> list[dict[str, str]]:
     st = time.perf_counter()
-    data_wikipedia = sorted(graph.get_twins(city_url), key=lambda x: x["name"])
+    data_wikipedia = sorted(graph.get_twins(city_url), key=lambda x: x["url"])
     print(f"Ran query (wikipedia) in {time.perf_counter() - st:0.2f} seconds")
     return data_wikipedia
 
@@ -556,7 +556,7 @@ def callbacks(_app: Dash):
         name = twins_names[row]
         details = twins_details[name["idx"]]
 
-        target_wikipedia = details.get("wikipedia", {}).get("url", "")
+        target_wikipedia = details.get("wikidata", {}).get("url", "")
         target_wikidata = details.get("wikidata", {}).get("targetId", "")
         if not target_wikidata:
             try:
