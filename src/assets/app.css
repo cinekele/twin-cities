@@ -280,3 +280,26 @@
     background-color: #f6f6f6;
     --bs-table-bg: #f6f6f6;
 }
+
+#div-edit-details {
+    display: flex;
+    direction: column;
+    padding: 10px;
+}
+
+.div-edit-details-col {
+    display: flex;
+    flex-direction: column;
+    align-items: baseline;
+}
+
+#button-group {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    width: 100%;
+}
+
+#select-all-button, #deselect-all-button {
+    width: 45%;
+}

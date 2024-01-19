@@ -145,7 +145,15 @@ def mask_none(value: str | None) -> str:
 twins_details: list[dict[str, dict[str, str]]] = []
 twins_names: list[dict[str, str | int]] = []
 references: list[dict[str, dict[str, str]]] = []
-references_names = ["url", "name", "website", "publisher", "language", "accessDate", "date"]
+references_names = [
+    "url",
+    "name",
+    "website",
+    "publisher",
+    "language",
+    "accessDate",
+    "date",
+]
 
 
 def setup():
@@ -319,111 +327,106 @@ def layout():
                                         children=html.Div(
                                             className="single-tab",
                                             children=[
-                                                html.H4(
-                                                    className="what-is",
-                                                    children="References and their properties",
-                                                ),
-                                                html.Button(
-                                                    "Select all properties",
-                                                    id="select-all-button",
-                                                    className="three columns",
-                                                ),
-                                                html.Button(
-                                                    "Deselect all properties",
-                                                    id="deselect-all-button",
-                                                    className="three columns",
-                                                ),
+                                                html.Div(id="dash-div-details"),
                                                 html.Div(
-                                                    [
-                                                        html.Div(id="dash-div-details"),
-                                                        dash_table.DataTable(
-                                                            id="dash-table-refs",
-                                                            row_selectable="multi",
-                                                            markdown_options={
-                                                                "html": True
-                                                            },
-                                                            columns=[
-                                                                {
-                                                                    "name": "Property",
-                                                                    "id": "property",
-                                                                },
-                                                                {
-                                                                    "name": "Wikipedia",
-                                                                    "id": "wikipedia",
-                                                                    "presentation": "markdown",
-                                                                    "type": "text",
-                                                                },
-                                                                {
-                                                                    "name": "Wikidata",
-                                                                    "id": "wikidata",
-                                                                    "presentation": "markdown",
-                                                                    "type": "text",
-                                                                },
-                                                            ],
-                                                            style_cell={
-                                                                "textAlign": "left"
-                                                            },  # , 'width': '33%'
-                                                            style_data={
-                                                                "whiteSpace": "normal"
-                                                            },  # , 'height': 'auto'
-                                                            style_table={
-                                                                "margin-top": "10px"
-                                                            },  # , 'width': '100%'
-                                                            style_data_conditional=STYLE_DATA_CONDITIONAL,
-                                                            css=[
-                                                                {
-                                                                    "selector": "table",
-                                                                    "rule": "table-layout: fixed",
-                                                                },
-                                                                {
-                                                                    "selector": ".dash-cell div.dash-cell-value",
-                                                                    "rule": "overflow-wrap: break-word",
-                                                                },
-                                                                {
-                                                                    "selector": "p",
-                                                                    "rule": "margin: 0",
-                                                                },
-                                                                {
-                                                                    "selector": "div.dash-cell-value.cell-markdown",
-                                                                    "rule": "font-family: monospace",
-                                                                },
-                                                            ],
+                                                    id="button-group",
+                                                    children=[
+                                                        html.Button(
+                                                            "Select all properties",
+                                                            id="select-all-button",
+                                                            className="three columns",
                                                         ),
                                                         html.Button(
-                                                            "Update Wikidata",
-                                                            id="update-button",
-                                                            hidden=True,
-                                                            style={
-                                                                "margin-top": "10px",
-                                                                "margin-bottom": "10px",
-                                                            },
-                                                        ),
-                                                        dbc.Alert(
-                                                            "ERROR !!! Something went wrong.",
-                                                            id="error_alert",
-                                                            is_open=False,
-                                                            fade=True,
-                                                            dismissable=True,
-                                                            style={
-                                                                "margin-top": "10px",
-                                                                "margin-bottom": "10px",
-                                                            },
-                                                            color="danger",
-                                                        ),
-                                                        dbc.Alert(
-                                                            "Update performed successfully !!!",
-                                                            id="success_alert",
-                                                            is_open=False,
-                                                            fade=True,
-                                                            dismissable=True,
-                                                            style={
-                                                                "margin-top": "10px",
-                                                                "margin-bottom": "10px",
-                                                            },
-                                                            color="success",
+                                                            "Deselect all properties",
+                                                            id="deselect-all-button",
+                                                            className="three columns",
                                                         ),
                                                     ],
-                                                    # style={'width': '50%', 'display': 'inline-block', 'margin-left': '5%'}
+                                                ),
+                                                dash_table.DataTable(
+                                                    id="dash-table-refs",
+                                                    row_selectable="multi",
+                                                    markdown_options={"html": True},
+                                                    columns=[
+                                                        {
+                                                            "name": "Property",
+                                                            "id": "property",
+                                                        },
+                                                        {
+                                                            "name": "Wikipedia",
+                                                            "id": "wikipedia",
+                                                            "presentation": "markdown",
+                                                            "type": "text",
+                                                        },
+                                                        {
+                                                            "name": "Wikidata",
+                                                            "id": "wikidata",
+                                                            "presentation": "markdown",
+                                                            "type": "text",
+                                                        },
+                                                    ],
+                                                    style_cell={
+                                                        "textAlign": "left"
+                                                    },  # , 'width': '33%'
+                                                    style_data={
+                                                        "whiteSpace": "normal"
+                                                    },  # , 'height': 'auto'
+                                                    style_table={
+                                                        "margin-top": "10px"
+                                                    },  # , 'width': '100%'
+                                                    style_data_conditional=STYLE_DATA_CONDITIONAL,
+                                                    css=[
+                                                        {
+                                                            "selector": "table",
+                                                            "rule": "table-layout: fixed",
+                                                        },
+                                                        {
+                                                            "selector": ".dash-cell div.dash-cell-value",
+                                                            "rule": "overflow-wrap: break-word",
+                                                        },
+                                                        {
+                                                            "selector": "p",
+                                                            "rule": "margin: 0",
+                                                        },
+                                                        {
+                                                            "selector": "div.dash-cell-value.cell-markdown",
+                                                            "rule": "font-family: monospace",
+                                                        },
+                                                    ],
+                                                ),
+                                                html.Button(
+                                                    "Update Wikidata",
+                                                    id="update-button",
+                                                    hidden=True,
+                                                    style={
+                                                        "margin-top": "10px",
+                                                        "margin-bottom": "10px",
+                                                        "width": "100%",
+                                                    },
+                                                ),
+                                                dbc.Alert(
+                                                    "ERROR !!! Something went wrong.",
+                                                    id="error_alert",
+                                                    is_open=False,
+                                                    fade=True,
+                                                    dismissable=True,
+                                                    style={
+                                                        "margin-top": "10px",
+                                                        "margin-bottom": "10px",
+                                                    },
+                                                    color="danger",
+                                                ),
+                                                dbc.Alert(
+                                                    "Update performed successfully !!!",
+                                                    id="success_alert",
+                                                    is_open=False,
+                                                    fade=True,
+                                                    dismissable=True,
+                                                    style={
+                                                        "margin-top": "10px",
+                                                        "margin-bottom": "10px",
+                                                    },
+                                                    color="success",
                                                 ),
                                             ],
                                         ),
@@ -474,7 +477,9 @@ def callbacks(_app: Dash):
             if "wikipedia" in references[ref_i]:
                 refs[ref_i] = {
                     **refs.get(ref_i, {}),
-                    references_names[i % len(references_names)]: references[ref_i]["wikipedia"][references_names[i % len(references_names)]],
+                    references_names[i % len(references_names)]: references[ref_i][
+                        "wikipedia"
+                    ][references_names[i % len(references_names)]],
                 }
 
         update_object = {
@@ -540,21 +545,82 @@ def callbacks(_app: Dash):
         name = twins_names[row]
         details = twins_details[name["idx"]]
 
-        div = {
-            "name": {
-                "wikipedia": mask_none(details.get("wikipedia", {}).get("name")),
-                "wikidata": mask_none(details.get("wikidata", {}).get("name")),
-            },
-            "url": {
-                "wikipedia": mask_none(
-                    mask_url(details.get("wikipedia", {}).get("url"), "url")
+        target_wikipedia = details.get("wikipedia", {}).get("url", "")
+        target_wikidata = details.get("wikidata", {}).get("targetId", "")
+
+        source_wikidata = ""
+        source_wikipedia = city_url or ""
+
+        for details in twins_details:
+            if "wikidata" in details:
+                source_wikidata = details["wikidata"].get("sourceId", "")
+                break
+
+        div = html.Div(
+            id="div-edit-details",
+            children=[
+                html.Div(
+                    className="twelve columns",
+                    children=[
+                        html.Div(
+                            className="div-edit-details-col",
+                            children=[
+                                html.P(
+                                    [
+                                        "Searched City: ",
+                                        html.A(
+                                            source_wikidata.removeprefix("http://"),
+                                            href=source_wikidata,
+                                            target="_blank",
+                                        ),
+                                    ]
+                                ),
+                                html.P(
+                                    [
+                                        "Searched City: ",
+                                        html.A(
+                                            source_wikipedia.removeprefix("https://"),
+                                            href=source_wikipedia,
+                                            target="_blank",
+                                        ),
+                                    ]
+                                ),
+                            ],
+                        )
+                    ],
                 ),
-                "wikidata": mask_none(
-                    mask_url(details.get("wikidata", {}).get("targetId"), "url")
+                html.Div(
+                    className="twelve columns",
+                    children=[
+                        html.Div(
+                            className="div-edit-details-col",
+                            children=[
+                                html.P(
+                                    [
+                                        "Twin City: ",
+                                        html.A(
+                                            target_wikidata.removeprefix("http://"),
+                                            href=target_wikidata,
+                                            target="_blank",
+                                        ),
+                                    ]
+                                ),
+                                html.P(
+                                    [
+                                        "Twin City: ",
+                                        html.A(
+                                            target_wikipedia.removeprefix("https://"),
+                                            href=target_wikipedia,
+                                            target="_blank",
+                                        ),
+                                    ]
+                                ),
+                            ],
+                        )
+                    ],
                 ),
-            },
-        }
-        div = str(div)
+            ],
+        )
 
         references_wikipedia = []
         if "wikipedia" in details:
@@ -664,32 +730,22 @@ def callbacks(_app: Dash):
         Input("select-all-button", "n_clicks"),
         Input("deselect-all-button", "n_clicks"),
         State("dash-table-refs", "data"),
-        State("dash-table-refs", "derived_virtual_data"),
-        State("dash-table-refs", "derived_virtual_selected_rows"),
     )
     def selection(
-        select_n_clicks, deselect_n_clicks, original_rows, filtered_rows, selected_rows
+        select_n_clicks,
+        deselect_n_clicks,
+        original_rows,  # , filtered_rows, selected_rows
     ):
-        print(
-            f"select_n_clicks: {select_n_clicks}, deselect_n_clicks: {deselect_n_clicks}, original_rows: {original_rows}, filtered_rows: {filtered_rows}, selected_rows: {selected_rows}"
-        )
         ctx = callback_context.triggered[0]
         ctx_caller = ctx["prop_id"]
-        if filtered_rows is not None:
-            if ctx_caller == "select-all-button.n_clicks":
-                selected_ids = [row["id"] for row in filtered_rows]
-                return [
-                    [
-                        i
-                        for i, row in enumerate(original_rows)
-                        if row["id"] in selected_ids
-                    ]
-                ]
-            if ctx_caller == "deselect-all-button.n_clicks":
-                return [[]]
+        # if filtered_rows is not None:
+        if ctx_caller == "deselect-all-button.n_clicks":
+            if deselect_n_clicks is None:
+                raise PreventUpdate
+            return []
+        if select_n_clicks is None:
             raise PreventUpdate
-        else:
-            raise PreventUpdate
+        return list(range(len(original_rows)))
 
 
 app = run_standalone_app(layout, callbacks, "Twin Cities", header_colors, __file__)
