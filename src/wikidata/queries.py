@@ -1,8 +1,11 @@
 import pandas as pd
 from SPARQLWrapper import SPARQLWrapper, JSON
+import uuid
 
 
-def run_query(sparql: SPARQLWrapper, query: str, city_url: str) -> list[dict[str, str]]:
+def run_query(
+    sparql: SPARQLWrapper, query: str, city_url: str, cache: bool = False
+) -> list[dict[str, str]]:
     """
     Executes a SPARQL query on a given SPARQL endpoint and returns the results as a list of dicts.
 
@@ -27,6 +30,9 @@ def run_query(sparql: SPARQLWrapper, query: str, city_url: str) -> list[dict[str
     >>> city_url = "https://en.wikipedia.org/wiki/Radom"
     >>> df = run_query(sparql, query, city_url)
     """
+    if not cache:
+        query = f"#{uuid.uuid4()}\n{query}"
+        sparql.addCustomHttpHeader("Cache-Control", "no-cache")
     sparql.setQuery(query.replace("{{CITY_URL}}", str(city_url)))
     ret = sparql.queryAndConvert()
     result = []
@@ -38,7 +44,9 @@ def run_query(sparql: SPARQLWrapper, query: str, city_url: str) -> list[dict[str
     return result
 
 
-def get_wikidata_twin_data(city_url: str, endpoint_url: str = "https://query.wikidata.org/sparql") -> list[dict[str, str]]:
+def get_wikidata_twin_data(
+    city_url: str, endpoint_url: str = "https://query.wikidata.org/sparql"
+) -> list[dict[str, str]]:
     """
     Sets up a SPARQL endpoint for Wikidata, runs a predefined query on it, and returns the results as a list of dicts.
 
@@ -122,7 +130,9 @@ WHERE
     return run_query(sparql, query, city_url)
 
 
-def extract_id_from_url(city_url: str, endpoint_url: str = "https://query.wikidata.org/sparql") -> list[str]:
+def extract_id_from_url(
+    city_url: str, endpoint_url: str = "https://query.wikidata.org/sparql"
+) -> list[str]:
     """
     Extracts the city ID from a given city URL.
 
@@ -153,7 +163,8 @@ def extract_id_from_url(city_url: str, endpoint_url: str = "https://query.wikida
     sparql.setReturnFormat(JSON)
 
     results = run_query(sparql=sparql, query=query, city_url=city_url)
-    return [item['id'].split('/')[-1] for item in results]
+    return [item["id"].split("/")[-1] for item in results]
+
 
 # def load_wikipedia_graph(filename: str) -> Graph:
 #     """
