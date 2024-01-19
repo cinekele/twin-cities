@@ -116,7 +116,7 @@ class Publisher:
             reference.append(
                 wdi_core.WDUrl(
                     value=referenceURL,
-                    prop_nr=self.PROPS["url"],
+                    prop_nr=self.PROPS["referenceURL"],
                     is_reference=True,
                 )
             )
