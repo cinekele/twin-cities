@@ -558,6 +558,12 @@ def callbacks(_app: Dash):
 
         target_wikipedia = details.get("wikipedia", {}).get("url", "")
         target_wikidata = details.get("wikidata", {}).get("targetId", "")
+        if not target_wikidata:
+            try:
+                ids = q.extract_id_from_url(target_wikipedia)
+                target_wikidata = f"http://www.wikidata.org/entity/{ids[-1]}"
+            except Exception as e:
+                print("Error retrieving wikidata id ", str(e))
 
         source_wikidata = ""
         source_wikipedia = city_url or ""
