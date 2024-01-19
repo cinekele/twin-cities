@@ -573,6 +573,13 @@ def callbacks(_app: Dash):
                 source_wikidata = _details["wikidata"].get("sourceId", "")
                 break
 
+        if not source_wikidata:
+            try:
+                ids = q.extract_id_from_url(source_wikipedia)
+                source_wikidata = f"http://www.wikidata.org/entity/{ids[-1]}"
+            except Exception as e:
+                print("Error retrieving wikidata id ", str(e))
+
         div = html.Div(
             id="div-edit-details",
             children=[
