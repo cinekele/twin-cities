@@ -181,4 +181,4 @@ throttle.ctrl
 *.jsonl
 apicache-py3/
 data/
-
+logs/
