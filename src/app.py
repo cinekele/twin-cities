@@ -556,7 +556,7 @@ def callbacks(_app: Dash):
         name = twins_names[row]
         details = twins_details[name["idx"]]
 
-        target_wikipedia = details.get("wikidata", {}).get("url", "")
+        target_wikipedia = details.get("wikipedia", {}).get("url", "")
         target_wikidata = details.get("wikidata", {}).get("targetId", "")
         if not target_wikidata:
             try:
