@@ -188,15 +188,16 @@ def layout():
                     It will allow you to compare information from
                     Wikipedia and Wikidata and update Wikidata.
                     
-                    First Select Tab XYZ to see the list of twin cities.
-                    Then ...
+                    Firstly select Tab Twin city comparison than provide city for which you want to compare information.
+                    Click on Run Query button to get table of twin cities of selected city from Wikipedia and Wikidata.
+                    You can select the twin city from the table and see the details of the city and references in the twin city edition tab.
+                    If you want to update the Wikidata, select the references and click on Update Wikidata button.
                     """
                             ),
                             html.P(
                                 """
-                    Read more about the component here:
-                    ...
-                    """
+                                This application is part of the project for the course Knowledge Graphs at Warsaw University of Technology.
+                                """
                             ),
                         ],
                     ),
