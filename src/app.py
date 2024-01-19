@@ -356,7 +356,7 @@ def layout():
                                                 dash_table.DataTable(
                                                     id="dash-table-refs",
                                                     row_selectable="multi",
-                                                    fixed_rows={"headers": True},
+                                                    # fixed_rows={"headers": True},
                                                     markdown_options={"html": True},
                                                     columns=[
                                                         {
