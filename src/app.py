@@ -534,13 +534,14 @@ def callbacks(_app: Dash):
         Output("dash-div-details", "children", allow_duplicate=True),
         Output("dash-table-refs", "data", allow_duplicate=True),
         Output("dash-table-refs", "style_data_conditional"),
+        Output("dash-table-refs", "selected_rows", allow_duplicate=True),
         Input("dash-table", "selected_rows"),
         State("city-url", "value"),
         prevent_initial_call=True,
     )
     def update_details_refs(selected_rows, city_url):
         if selected_rows is None or len(selected_rows) == 0:
-            return None, None, STYLE_DATA_CONDITIONAL
+            return None, None, STYLE_DATA_CONDITIONAL, []
 
         row = selected_rows[0]
         name = twins_names[row]
@@ -663,7 +664,7 @@ def callbacks(_app: Dash):
                 "backgroundColor": "rgb(220, 220, 220)",
             },
         ]
-        return div, table, _style_data_conditional
+        return div, table, _style_data_conditional, []
 
     @_app.callback(
         Output("update-button", "hidden", allow_duplicate=True),
@@ -701,13 +702,15 @@ def callbacks(_app: Dash):
         Output("dash-table-refs", "data"),
         Output("hide-switch", "on"),
         Output("update-button", "hidden"),
+        Output("dash-table", "selected_rows", allow_duplicate=True),
+        Output("dash-table-refs", "selected_rows", allow_duplicate=True),
         Input("run-button", "n_clicks"),
         State("city-url", "value"),
         prevent_initial_call=True,
     )
     def update_table(n_clicks, city_url):
         if n_clicks is None:
-            return None, None, None, False, True  # Not clicked yet
+            return None, None, None, False, True, [], []  # Not clicked yet
 
         data_wikidata = load_twins_wikidata(city_url)
         data_wikipedia = load_twins_wikipedia(city_url)
@@ -724,7 +727,7 @@ def callbacks(_app: Dash):
                     "idx": i,
                 }
             )
-        return twins_names, None, None, False, True
+        return twins_names, None, None, False, True, [], []
 
     @_app.callback(
         Output("dash-table-refs", "selected_rows"),
