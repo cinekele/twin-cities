@@ -1,6 +1,8 @@
 # Twin Cities
 
-...
+Twin Cities is a web application that allows you to compare twin cities agreements between two data sources: Wikidata and Wikipedia.
+It makes it easy to find out which cities are twinned in Wikipedia, but not in Wikidata, and update Wikidata accordingly.
+It shows you which informations are missing in Wikidata, and enables you to add them easily.
 
 ## Installation
 
