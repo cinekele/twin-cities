@@ -58,6 +58,8 @@ def load_twins_wikidata(city_url: str) -> list[dict[str, str | list[dict[str, st
     # remap keys
     data_wikidata = []
     for i in range(len(raw)):
+        if "targetUrl" not in raw[i]:
+            continue
         raw[i]["url"] = urllib.parse.unquote(raw[i].pop("targetUrl"))
         raw[i]["name"] = raw[i].pop("targetLabel")
 
@@ -66,7 +68,15 @@ def load_twins_wikidata(city_url: str) -> list[dict[str, str | list[dict[str, st
             and raw[i]["targetId"] == raw[i - 1]["targetId"]
             and "referenceUrl" in raw[i]
         ):
-            data_wikidata[-1]["references"].append(raw[i]["referenceUrl"])
+            data_wikidata[-1]["references"].append({
+                "url": raw[i].pop("referenceUrl"),
+                "name": raw[i].pop("referenceName")
+                if "referenceName" in raw[i]
+                else None,
+                "publisher": raw[i].pop("referencePublisher")
+                if "referencePublisher" in raw[i]
+                else None,
+            })
         else:
             data_wikidata.append({**raw[i]})
             data_wikidata[-1]["references"] = []
@@ -458,8 +468,6 @@ def callbacks(_app: Dash):
             or city_url is None
             or selected_rows is None
             or len(selected_rows) == 0
-            or selected_rows_refs is None
-            or len(selected_rows_refs) == 0
         ):
             return False, None
 
@@ -473,15 +481,16 @@ def callbacks(_app: Dash):
         details = twins_details[row]
 
         refs = {}
-        for i in selected_rows_refs:
-            ref_i = i // len(references_names)
-            if "wikipedia" in references[ref_i]:
-                refs[ref_i] = {
-                    **refs.get(ref_i, {}),
-                    references_names[i % len(references_names)]: references[ref_i][
-                        "wikipedia"
-                    ][references_names[i % len(references_names)]],
-                }
+        if not (selected_rows_refs is None or len(selected_rows_refs) == 0):
+            for i in selected_rows_refs:
+                ref_i = i // len(references_names)
+                if "wikipedia" in references[ref_i]:
+                    refs[ref_i] = {
+                        **refs.get(ref_i, {}),
+                        references_names[i % len(references_names)]: references[ref_i][
+                            "wikipedia"
+                        ][references_names[i % len(references_names)]],
+                    }
 
         update_object = {
             "sourceUrl": city_url,
@@ -553,9 +562,9 @@ def callbacks(_app: Dash):
         source_wikidata = ""
         source_wikipedia = city_url or ""
 
-        for details in twins_details:
-            if "wikidata" in details:
-                source_wikidata = details["wikidata"].get("sourceId", "")
+        for _details in twins_details:
+            if "wikidata" in _details:
+                source_wikidata = _details["wikidata"].get("sourceId", "")
                 break
 
         div = html.Div(
@@ -626,13 +635,13 @@ def callbacks(_app: Dash):
 
         references_wikipedia = []
         if "wikipedia" in details:
-            references_wikipedia = graph.get_references(
+            references_wikipedia = sorted(graph.get_references(
                 city_url, details["wikipedia"]["url"]
-            )
+            ), key=lambda x: x["url"])
 
         references_wikidata = []
         if "wikidata" in details:
-            references_wikidata = details["wikidata"]["references"]
+            references_wikidata = sorted(details["wikidata"]["references"], key=lambda x: x["url"])
 
         global references
         references = align(references_wikidata, references_wikipedia)
@@ -669,11 +678,17 @@ def callbacks(_app: Dash):
     @_app.callback(
         Output("update-button", "hidden", allow_duplicate=True),
         Input("dash-table-refs", "selected_rows"),
+        Input("dash-table", "selected_rows"),
         prevent_initial_call=True,
     )
-    def update_button_hide(selected_rows):
+    def update_button_hide(selected_rows, selected_rows_main):
         if selected_rows is None or len(selected_rows) == 0:
-            return True
+            if selected_rows_main is None or len(selected_rows_main) == 0:
+                return True
+            row = selected_rows_main[0]
+            name = twins_names[row]
+            if name["wikidata"] is not None:
+                return True
         return False
 
     @_app.callback(
