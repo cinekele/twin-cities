@@ -90,7 +90,7 @@ class Publisher:
         )
 
     def _create_reference(
-        self, data: dict
+            self, data: dict
     ) -> list[WDTime | WDUrl | WDMonolingualText | WDString]:
         """
         Creates a reference for a given item.
@@ -121,7 +121,7 @@ class Publisher:
                 )
             )
         if (title := data.get("name")) is not None:
-            lang = data.get("language", "en")
+            lang = data.get("language", "en") or "en"
             reference.append(
                 wdi_core.WDMonolingualText(
                     value=title,
