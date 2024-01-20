@@ -49,21 +49,31 @@ def load_cities() -> list[dict[str, str]]:
 city_urls: list[dict[str, str]] = []
 
 
+def get_id_by_url(url: str) -> str:
+    if url is None or url == "":
+        return ""
+    ids = q.extract_id_from_url(url)
+    if len(ids) == 0:
+        return ""
+    return f"http://www.wikidata.org/entity/{ids[-1]}"
+
+
 def load_twins_wikidata(city_url: str) -> list[dict[str, str | list[dict[str, str]]]]:
     st = time.perf_counter()
-    raw = sorted(q.get_wikidata_twin_data(city_url), key=lambda x: x["targetUrl"])
+    raw = q.get_wikidata_twin_data(city_url)
     print(f"Ran query (wikidata) in {time.perf_counter() - st:0.2f} seconds")
     # remap keys
     data_wikidata = []
     for i in range(len(raw)):
         if "targetUrl" not in raw[i]:
             continue
+        raw[i]["id"] = raw[i].pop("targetId", "")
         raw[i]["url"] = urllib.parse.unquote(raw[i].pop("targetUrl"))
         raw[i]["name"] = raw[i].pop("targetLabel")
 
         if (
             i > 0
-            and raw[i]["targetId"] == raw[i - 1]["targetId"]
+            and raw[i]["id"] == raw[i - 1]["id"]
             and "referenceUrl" in raw[i]
         ):
             data_wikidata[-1]["references"].append(
@@ -92,48 +102,49 @@ def load_twins_wikidata(city_url: str) -> list[dict[str, str | list[dict[str, st
                         else None,
                     }
                 )
+    data_wikidata = sorted(data_wikidata, key=lambda x: x["id"])
     return data_wikidata
 
 
 def load_twins_wikipedia(city_url: str) -> list[dict[str, str]]:
     st = time.perf_counter()
-    data_wikipedia = sorted(graph.get_twins(city_url), key=lambda x: x["url"])
+    data_wikipedia = graph.get_twins(city_url)
     print(f"Ran query (wikipedia) in {time.perf_counter() - st:0.2f} seconds")
+    data_wikipedia = [{
+        "id": get_id_by_url(twin["url"]),
+        **twin,
+    } for twin in data_wikipedia]
+    data_wikipedia = sorted(data_wikipedia, key=lambda x: x["id"])
     return data_wikipedia
 
 
 def align(
-    data_1: list[dict[str, str]], data_2: list[dict[str, str]]
+    data_wikidata: list[dict[str, str]], data_wikipedia: list[dict[str, str]], prop: str
 ) -> list[dict[str, dict[str, str]]]:
     data = []
     i = 0
     j = 0
-    while i < len(data_1) and j < len(data_2):
-        if data_1[i]["url"] != data_2[j]["url"]:
-            if data_1[i]["name"] == data_2[j]["name"]:
-                data.append({"wikidata": data_1[i], "wikipedia": data_2[j]})
+    while i < len(data_wikidata) and j < len(data_wikipedia):
+        if data_wikidata[i][prop] != data_wikipedia[j][prop]:
+            if data_wikidata[i][prop] < data_wikipedia[j][prop]:
+                data.append({"wikidata": data_wikidata[i]})
                 i += 1
+            elif data_wikidata[i][prop] > data_wikipedia[j][prop]:
+                data.append({"wikipedia": data_wikipedia[j]})
                 j += 1
-            else:
-                if data_1[i]["url"] < data_2[j]["url"]:
-                    data.append({"wikidata": data_1[i]})
-                    i += 1
-                elif data_1[i]["url"] > data_2[j]["url"]:
-                    data.append({"wikipedia": data_2[j]})
-                    j += 1
         else:
-            data.append({"wikidata": data_1[i], "wikipedia": data_2[j]})
+            data.append({"wikidata": data_wikidata[i], "wikipedia": data_wikipedia[j]})
             i += 1
             j += 1
-    while i < len(data_1):
+    while i < len(data_wikidata):
         data.append(
             {
-                "wikidata": data_1[i],
+                "wikidata": data_wikidata[i],
             }
         )
         i += 1
-    while j < len(data_2):
-        data.append({"wikipedia": data_2[j]})
+    while j < len(data_wikipedia):
+        data.append({"wikipedia": data_wikipedia[j]})
         j += 1
     return data
 
@@ -557,16 +568,21 @@ def callbacks(_app: Dash):
         details = twins_details[name["idx"]]
 
         target_wikipedia = details.get("wikipedia", {}).get("url", "")
-        target_wikidata = details.get("wikidata", {}).get("targetId", "")
+        if not target_wikipedia:
+            target_wikipedia = details.get("wikidata", {}).get("url", "")
+
+        target_wikidata = details.get("wikipedia", {}).get("id", "")
+        if not target_wikidata:
+            target_wikidata = details.get("wikidata", {}).get("id", "")
         if not target_wikidata:
             try:
-                ids = q.extract_id_from_url(target_wikipedia)
-                target_wikidata = f"http://www.wikidata.org/entity/{ids[-1]}"
+                target_wikidata = get_id_by_url(target_wikipedia)
             except Exception as e:
                 print("Error retrieving wikidata id ", str(e))
 
-        source_wikidata = ""
         source_wikipedia = city_url or ""
+
+        source_wikidata = ""
 
         for _details in twins_details:
             if "wikidata" in _details:
@@ -575,8 +591,7 @@ def callbacks(_app: Dash):
 
         if not source_wikidata:
             try:
-                ids = q.extract_id_from_url(source_wikipedia)
-                source_wikidata = f"http://www.wikidata.org/entity/{ids[-1]}"
+                source_wikidata = get_id_by_url(source_wikipedia)
             except Exception as e:
                 print("Error retrieving wikidata id ", str(e))
 
@@ -660,7 +675,7 @@ def callbacks(_app: Dash):
             )
 
         global references
-        references = align(references_wikidata, references_wikipedia)
+        references = align(references_wikidata, references_wikipedia, "url")
 
         table = []
         for reference in references:
@@ -747,7 +762,8 @@ def callbacks(_app: Dash):
         data_wikipedia = load_twins_wikipedia(city_url)
 
         global twins_details, twins_names
-        twins_details = align(data_wikidata, data_wikipedia)
+        twins_details = align(data_wikidata, data_wikipedia, "id")
+        twins_details = sorted(twins_details, key=lambda x: x.get("wikipedia", x.get("wikidata", {})).get("name", ""))
         twins_names = []
 
         for i, result in enumerate(twins_details):
